@@ -1,0 +1,124 @@
+/* Container principal da página de login */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at 30% 20%, #2b2b2b, #1a1a1a);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Card central com sombra suave */
+.card-light {
+  background: #222;
+  border-radius: 16px;
+  padding: 2.5rem 3rem;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Animação leve de entrada */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Título principal */
+.login-container h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.5px;
+  color: #e0e0e0;
+}
+
+/* Labels e inputs */
+.card-light label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  color: #b0b0b0;
+}
+
+.card-light input,
+.card-light select {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background: #2e2e2e;
+  color: #f5f5f5;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.card-light input:focus,
+.card-light select:focus {
+  outline: none;
+  border-color: #6a5acd;
+  background: #333;
+}
+
+/* Grupo de botões */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+/* Botão principal */
+.btn {
+  cursor: pointer;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.btn-primary {
+  background: #6a5acd;
+  color: #fff;
+  padding: 0.7rem;
+}
+
+.btn-primary:hover {
+  background: #7a68e6;
+  transform: translateY(-1px);
+}
+
+/* Botão de link secundário */
+.btn-link {
+  background: transparent;
+  color: #aaa;
+  text-decoration: underline;
+  padding: 0.4rem;
+}
+
+.btn-link:hover {
+  color: #d0d0d0;
+}
+
+/* Responsividade */
+@media (max-width: 480px) {
+  .card-light {
+    padding: 2rem;
+    margin: 1rem;
+  }
+
+  .login-container h1 {
+    font-size: 1.5rem;
+  }
+}

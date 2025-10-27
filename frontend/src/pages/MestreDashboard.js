@@ -1,92 +1,56 @@
-// /src/pages/MestreDashboard.js
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { apiGetCampanhas, apiCreateCampanha } from '../api/mockApi';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from "react";
+import { getCampanhasByMestre, createCampanha } from "../api/api";
+import { useAuth } from "../context/AuthContext";
 
-// Componente simples para o formulário
-function CampanhaForm({ onCampanhaCriada }) {
-  const [nome, setNome] = useState('');
-  const [descricao, setDescricao] = useState('');
+export default function Mestr eDashboard() {
   const { jogador } = useAuth();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const novaCampanha = {
-      nome,
-      descricao,
-      template_atributos_base: [], // O Mestre edita isso na pág de detalhes
-      template_habilidades: [],
-      template_outros: [],
-    };
-    const campanha = await apiCreateCampanha(jogador.id, novaCampanha);
-    onCampanhaCriada(campanha);
-    setNome('');
-    setDescricao('');
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="card">
-      <h3>Criar Nova Campanha</h3>
-      <div className="form-group">
-        <label>Nome da Campanha</label>
-        <input
-          type="text"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label>Descrição</label>
-        <textarea
-          value={descricao}
-          onChange={(e) => setDescricao(e.target.value)}
-        />
-      </div>
-      <button type="submit" className="btn btn-primary">Criar</button>
-    </form>
-  );
-}
-
-function MestreDashboard() {
   const [campanhas, setCampanhas] = useState([]);
+  const [nomeCampanha, setNomeCampanha] = useState("");
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
 
   useEffect(() => {
-    apiGetCampanhas().then((data) => {
-      setCampanhas(data);
-      setLoading(false);
-    });
-  }, []);
+    const fetchCampanhas = async () => {
+      try {
+        const data = await getCampanhasByMestre(jogador.id);
+        setCampanhas(data);
+      } catch {
+        setErro("Erro ao carregar campanhas");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCampanhas();
+  }, [jogador]);
 
-  const handleCampanhaCriada = (novaCampanha) => {
-    setCampanhas([...campanhas, novaCampanha]);
+  const handleCreate = async () => {
+    if (!nomeCampanha.trim()) return;
+    try {
+      const nova = await createCampanha({ nome: nomeCampanha, mestre_id: jogador.id });
+      setCampanhas([...campanhas, nova]);
+      setNomeCampanha("");
+    } catch {
+      setErro("Erro ao criar campanha");
+    }
   };
 
   if (loading) return <p>Carregando...</p>;
+  if (erro) return <p>{erro}</p>;
 
   return (
-    <div>
-      <h2>Dashboard do Mestre</h2>
-      <div className="layout-grid">
-        <div className="card-list">
-          <h3>Suas Campanhas</h3>
-          {campanhas.length === 0 ? (
-            <p>Nenhuma campanha criada.</p>
-          ) : (
-            campanhas.map((c) => (
-              <Link to={`/mestre/campanha/${c.id}`} key={c.id} className="card card-link">
-                <h4>{c.nome}</h4>
-                <p>{c.descricao}</p>
-              </Link>
-            ))
-          )}
-        </div>
-        <CampanhaForm onCampanhaCriada={handleCampanhaCriada} />
-      </div>
+    <div className="p-4">
+      <h1>Campanhas do Mestre {jogador.nome}</h1>
+      <input
+        placeholder="Nova campanha"
+        value={nomeCampanha}
+        onChange={(e) => setNomeCampanha(e.target.value)}
+      />
+      <button onClick={handleCreate}>Criar</button>
+      <ul>
+        {campanhas.map((c) => (
+          <li key={c.id}>{c.nome}</li>
+        ))}
+      </ul>
     </div>
   );
 }
-
-export default MestreDashboard;

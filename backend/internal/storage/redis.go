@@ -61,7 +61,7 @@ func GetJogador(nome string) (model.Jogador, error) {
 		return model.Jogador{}, err
 	}
 
-	err = json.Unmarshal(jogadorData, jogador)
+	err = json.Unmarshal(jogadorData, &jogador)
 	if err != nil {
 		return model.Jogador{}, err
 	}
@@ -70,9 +70,13 @@ func GetJogador(nome string) (model.Jogador, error) {
 }
 
 func SetNovoJogador(novoJogador model.Jogador) (model.Jogador, error) {
-	err := rdb.Set(context.TODO(), (jogadorPattern + novoJogador.ID), novoJogador, 0)
+	valueInJson, err := json.Marshal(novoJogador)
 	if err != nil {
-		return model.Jogador{}, fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return model.Jogador{}, fmt.Errorf("Erro convertendo jogador para JSON: %s", err.Error())
+	}
+	err = rdb.Set(context.TODO(), (jogadorPattern + novoJogador.ID), valueInJson, 0).Err()
+	if err != nil {
+		return model.Jogador{}, fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return novoJogador, nil
 }
@@ -85,7 +89,7 @@ func GetMestre(nome string) (model.Jogador, error) {
 		return model.Jogador{}, err
 	}
 
-	err = json.Unmarshal(jogadorData, jogador)
+	err = json.Unmarshal(jogadorData, &jogador)
 	if err != nil {
 		return model.Jogador{}, err
 	}
@@ -94,9 +98,13 @@ func GetMestre(nome string) (model.Jogador, error) {
 }
 
 func SetNovoMestre(novoJogador model.Jogador) (model.Jogador, error) {
-	err := rdb.Set(context.TODO(), (mestrePattern + novoJogador.ID), novoJogador, 0)
+	valueInJson, err := json.Marshal(novoJogador)
 	if err != nil {
-		return model.Jogador{}, fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return model.Jogador{}, fmt.Errorf("Erro convertendo jogador para JSON: %s", err.Error())
+	}
+	err = rdb.Set(context.TODO(), (mestrePattern + novoJogador.ID), valueInJson, 0).Err()
+	if err != nil {
+		return model.Jogador{}, fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return novoJogador, nil
 }
@@ -104,9 +112,13 @@ func SetNovoMestre(novoJogador model.Jogador) (model.Jogador, error) {
 // Campanha
 
 func CreateCampanha(campanha model.Campanha) (model.Campanha, error) {
-	err := rdb.Set(context.TODO(), (campanhaPattern + campanha.ID), campanha, 0)
+	valueJson, err := json.Marshal(campanha)
 	if err != nil {
-		return model.Campanha{}, fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return model.Campanha{}, fmt.Errorf("Erro convertendo campanha para JSON: %s", err.Error())
+	}
+	err = rdb.Set(context.TODO(), (campanhaPattern + campanha.ID), valueJson, 0).Err()
+	if err != nil {
+		return model.Campanha{}, fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return campanha, nil
 }
@@ -116,10 +128,13 @@ func GetCampanhas() ([]model.Campanha, error) {
 
 	campanhasData, err := rdb.Get(context.TODO(), (campanhaPattern + "*")).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Campanha{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(campanhasData, campanhas)
+	err = json.Unmarshal(campanhasData, &campanhas)
 	if err != nil {
 		return nil, err
 	}
@@ -132,10 +147,13 @@ func GetCampanhasByMestre(idMestre string) ([]model.Campanha, error) {
 
 	campanhasData, err := rdb.Get(context.TODO(), (campanhaPattern + "*")).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Campanha{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(campanhasData, campanhas)
+	err = json.Unmarshal(campanhasData, &campanhas)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +174,13 @@ func GetPersonagensByCampanha(idCampanha string) ([]model.Personagem, error) {
 
 	personagensData, err := rdb.Get(context.TODO(), (personagemPattern + "*")).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Personagem{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(personagensData, personagens)
+	err = json.Unmarshal(personagensData, &personagens)
 	if err != nil {
 		return nil, err
 	}
@@ -180,10 +201,13 @@ func GetPersonagensByCampanhaJogador(idCampanha, idJogador string) ([]model.Pers
 
 	personagensData, err := rdb.Get(context.TODO(), (personagemPattern + "*")).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Personagem{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(personagensData, personagens)
+	err = json.Unmarshal(personagensData, &personagens)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +224,13 @@ func GetPersonagensByCampanhaJogador(idCampanha, idJogador string) ([]model.Pers
 }
 
 func UpdateTemplateCampanha(campanha model.Campanha) error {
-	err := rdb.Set(context.TODO(), (campanhaPattern + campanha.ID), campanha, 0)
+	valueJson, err := json.Marshal(campanha)
 	if err != nil {
-		return fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return fmt.Errorf("Erro convertendo campanha para JSON: %s", err.Error())
+	}	
+	err = rdb.Set(context.TODO(), (campanhaPattern + campanha.ID), valueJson, 0).Err()
+	if err != nil {
+		return fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return nil
 }
@@ -212,10 +240,13 @@ func GetCampanhaByID(idCampanha string) (model.Campanha, error) {
 
 	campanhaData, err := rdb.Get(context.TODO(), (campanhaPattern + idCampanha)).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return model.Campanha{}, fmt.Errorf("Campanha não encontrada")
+		}
 		return model.Campanha{}, err
 	}
 
-	err = json.Unmarshal(campanhaData, campanha)
+	err = json.Unmarshal(campanhaData, &campanha)
 	if err != nil {
 		return model.Campanha{}, err
 	}
@@ -226,9 +257,13 @@ func GetCampanhaByID(idCampanha string) (model.Campanha, error) {
 // Personagens
 
 func CreatePersonagem(novoPersonagem model.Personagem) (model.Personagem, error) {
-	err := rdb.Set(context.TODO(), (personagemPattern + novoPersonagem.ID), novoPersonagem, 0)
+	valueJson, err := json.Marshal(novoPersonagem)
 	if err != nil {
-		return model.Personagem{}, fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return model.Personagem{}, fmt.Errorf("Erro convertendo personagem para JSON: %s", err.Error())
+	}
+	err = rdb.Set(context.TODO(), (personagemPattern + novoPersonagem.ID), valueJson, 0).Err()
+	if err != nil {
+		return model.Personagem{}, fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return novoPersonagem, nil
 }
@@ -238,10 +273,13 @@ func GetPersonagensByJogador(idJogador string) ([]model.Personagem, error) {
 
 	personagensData, err := rdb.Get(context.TODO(), (personagemPattern + "*")).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Personagem{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(personagensData, personagens)
+	err = json.Unmarshal(personagensData, &personagens)
 	if err != nil {
 		return nil, err
 	}
@@ -262,10 +300,13 @@ func GetPersonagemByID(idPersonagem string) (model.Personagem, error){
 
 	personagemData, err := rdb.Get(context.TODO(), (personagemPattern + idPersonagem)).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return model.Personagem{}, fmt.Errorf("Personagem não encontrado")
+		}
 		return model.Personagem{}, err
 	}
 
-	err = json.Unmarshal(personagemData, personagem)
+	err = json.Unmarshal(personagemData, &personagem)
 	if err != nil {
 		return model.Personagem{}, err
 	}
@@ -274,9 +315,13 @@ func GetPersonagemByID(idPersonagem string) (model.Personagem, error){
 }
 
 func UpdatePersonagem(personagem model.Personagem) error {
-	err := rdb.Set(context.TODO(), (personagemPattern + personagem.ID), personagem, 0)
+	valueJson, err := json.Marshal(personagem)
 	if err != nil {
-		return fmt.Errorf("Erro salvando novo jogador no Redis: %s", err.Err())
+		return fmt.Errorf("Erro convertendo personagem para JSON: %s", err.Error())
+	}
+	err = rdb.Set(context.TODO(), (personagemPattern + personagem.ID), valueJson, 0).Err()
+	if err != nil {
+		return fmt.Errorf("Erro salvando novo jogador no Redis: %w", err)
 	}
 	return nil
 }
@@ -295,10 +340,13 @@ func GetItensByPersonagem(personagemID string) ([]model.Item, error) {
 
 	personagemData, err := rdb.Get(context.TODO(), (personagemPattern + personagemID)).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return []model.Item{}, nil
+		}
 		return nil, err
 	}
 
-	err = json.Unmarshal(personagemData, personagem)
+	err = json.Unmarshal(personagemData, &personagem)
 	if err != nil {
 		return nil, err
 	}

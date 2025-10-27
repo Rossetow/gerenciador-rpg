@@ -15,6 +15,8 @@ services:
     # A sintaxe "HOST:CONTAINER" é para a seção 'ports'.
     expose:
       - "6379"
+    ports:
+      - "6379:6379"
     ### CORREÇÃO 2: Adicionar Healthcheck ###
     # Isso permite que outros serviços esperem o Redis ficar pronto.
     # Ele tenta dar um PING no Redis usando a senha.
@@ -45,6 +47,8 @@ services:
       - REDIS_PASSWORD=redis_rpg
     expose:
       - "8080"
+    ports:
+      - "8080:8080"
     # Boa prática: reiniciar o serviço se ele falhar
     restart: unless-stopped
 

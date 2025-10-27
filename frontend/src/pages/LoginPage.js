@@ -1,64 +1,62 @@
-// /src/pages/LoginPage.js
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import "../styles/LoginPage.css";
 
-function LoginPage() {
-  const [nome, setNome] = useState('');
-  const [role, setRole] = useState(null); // 'mestre' ou 'jogador'
+
+export default function LoginPage() {
+  const { handleLogin } = useAuth();
+  const [nome, setNome] = useState("");
+  const [role, setRole] = useState("jogador"); // jogador ou mestre
+  const [isCadastro, setIsCadastro] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nome || !role) return;
+    if (!nome.trim()) return alert("Digite um nome");
     setLoading(true);
-    await login(nome, role);
-    setLoading(false);
-    navigate(role === 'mestre' ? '/mestre' : '/jogador');
+    try {
+      await handleLogin(nome, role, isCadastro);
+      navigate(role === "mestre" ? "/mestre" : "/jogador");
+    } catch (err) {
+      alert("Erro ao autenticar");
+    } finally {
+      setLoading(false);
+    }
   };
-
-  if (role) {
-    return (
-      <div className="login-container">
-        <h2>Entrar como {role}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Seu Nome:</label>
-            <input
-              type="text"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Digite seu nome"
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-          <button onClick={() => setRole(null)} className="btn btn-link">
-            Voltar
-          </button>
-        </form>
-      </div>
-    );
-  }
 
   return (
     <div className="login-container">
-      <h1>Bem-vindo!</h1>
-      <p>Como você quer entrar?</p>
-      <div className="btn-group">
-        <button onClick={() => setRole('mestre')} className="btn btn-primary">
-          Entrar como Mestre
-        </button>
-        <button onClick={() => setRole('jogador')} className="btn btn-secondary">
-          Entrar como Jogador
-        </button>
-      </div>
+      <h1>Gerenciador de Fichas RPG</h1>
+      <form onSubmit={handleSubmit} className="card-light">
+        <label>Nome:</label>
+        <input
+          type="text"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          placeholder="Digite seu nome"
+        />
+
+        <label>Entrar como:</label>
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="jogador">Jogador</option>
+          <option value="mestre">Mestre</option>
+        </select>
+
+        <div className="btn-group">
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {isCadastro ? "Cadastrar" : "Entrar"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-link"
+            onClick={() => setIsCadastro(!isCadastro)}
+          >
+            {isCadastro ? "Já tenho conta" : "Criar nova conta"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
-
-export default LoginPage;
