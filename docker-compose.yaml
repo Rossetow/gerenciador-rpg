@@ -1,0 +1,74 @@
+# 'services' define os contêineres que farão parte da sua aplicação
+services:
+
+  # 1. Serviço do Redis
+  redis-service:
+    image: redis:7-alpine
+    container_name: rpg-redis
+    command: redis-server --requirepass redis_rpg
+    networks:
+      - rpg-net
+    volumes:
+      - redis-data:/data
+    ### CORREÇÃO 1: Sintaxe do 'expose' ###
+    # 'expose' deve listar apenas a porta INTERNA do contêiner.
+    # A sintaxe "HOST:CONTAINER" é para a seção 'ports'.
+    expose:
+      - "6379"
+    ### CORREÇÃO 2: Adicionar Healthcheck ###
+    # Isso permite que outros serviços esperem o Redis ficar pronto.
+    # Ele tenta dar um PING no Redis usando a senha.
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_rpg", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Serviço do Backend (Go)
+  backend-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rpg-backend
+    networks:
+      - rpg-net
+    ### CORREÇÃO 3: Melhorar o 'depends_on' ###
+    # Agora o backend vai esperar até que o healthcheck do Redis passe.
+    depends_on:
+      redis-service:
+        condition: service_healthy
+    environment:
+      - GIN_MODE=release
+      - REDIS_ADDR=redis-service:6379
+      ### CORREÇÃO 4: Passar a Senha ###
+      # O seu backend precisa da senha para se conectar ao Redis.
+      - REDIS_PASSWORD=redis_rpg
+    expose:
+      - "8080"
+    # Boa prática: reiniciar o serviço se ele falhar
+    restart: unless-stopped
+
+  # 3. Serviço do Frontend (React + Nginx)
+  frontend-service:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rpg-frontend
+    networks:
+      - rpg-net
+    depends_on:
+      - backend-service
+    ports:
+      - "3000:80"
+    # Boa prática: reiniciar o serviço se ele falhar
+    restart: unless-stopped
+
+# 'networks' define a rede virtual privada para nossos contêineres
+networks:
+  rpg-net:
+    driver: bridge
+
+# 'volumes' define os volumes nomeados para persistência de dados
+volumes:
+  redis-data:
+    driver: local

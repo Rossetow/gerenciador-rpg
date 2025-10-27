@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine  # Imagem oficial do Redis
+        ports:
+        - containerPort: 6379 # Porta padrão do Redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service  # Nome que o backend usará para se conectar
+spec:
+  selector:
+    app: redis
+  ports:
+  - protocol: TCP
+    port: 6379         # Porta que o serviço expõe
+    targetPort: 6379   # Porta no contêiner

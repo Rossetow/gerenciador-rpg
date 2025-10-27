@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: gerenciador-backend:latest # O nome da imagem que vamos construir
+        imagePullPolicy: IfNotPresent # Diz ao K8s para usar a imagem local
+        ports:
+        - containerPort: 8080 # A porta do Gin
+        env:
+        - name: GIN_MODE
+          value: "release"
+        # --- IMPORTANTE ---
+        # Se o seu backend for usar o Redis, adicione a variável de ambiente:
+        # - name: REDIS_ADDR
+        #   value: "redis-service:6379" # O nome do Serviço do Redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service # Nome que o Nginx usará para se conectar
+spec:
+  selector:
+    app: backend
+  type: ClusterIP # Só precisa ser acessível DENTRO do cluster (pelo Nginx)
+  ports:
+  - protocol: TCP
+    port: 8080         # Porta que o serviço expõe
+    targetPort: 8080   # Porta no contêiner
