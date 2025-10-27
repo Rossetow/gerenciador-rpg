@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getCampanhasByMestre, createCampanha } from "../api/api";
 import { useAuth } from "../context/AuthContext";
 
-export default function Mestr eDashboard() {
+export default function MestreDashboard() {
   const { jogador } = useAuth();
   const [campanhas, setCampanhas] = useState([]);
   const [nomeCampanha, setNomeCampanha] = useState("");
