@@ -9,6 +9,7 @@ import (
 
 	"gerenciador-de-fichas/internal/model"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,8 +21,16 @@ func NewPostgresStorage() {
 		log.Fatal("DATABASE_URL env var not set")
 	}
 
-	var err error
-	pool, err = pgxpool.New(context.Background(), dsn)
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		log.Fatalf("Could not parse DATABASE_URL: %v", err)
+	}
+
+	// Disable prepared statement cache — required when using Supabase/PgBouncer
+	// in transaction pooling mode, which doesn't preserve statement state across connections.
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	pool, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatalf("Could not connect to PostgreSQL: %v", err)
 	}
