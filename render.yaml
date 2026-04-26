@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: gerenciador-rpg-backend
+    runtime: go
+    rootDir: backend
+    buildCommand: go build -o main .
+    startCommand: ./main
+    healthCheckPath: /health
+    envVars:
+      - key: GIN_MODE
+        value: release
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

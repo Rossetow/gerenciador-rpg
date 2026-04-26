@@ -1,22 +1,4 @@
 services:
-  redis-service:
-    image: redis:7-alpine
-    container_name: rpg-redis
-    command: redis-server --requirepass redis_rpg
-    networks:
-      - rpg-net
-    volumes:
-      - redis-data:/data
-    expose:
-      - "6379"
-    ports:
-      - "6379:6379" 
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_rpg", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend-service:
     build:
       context: ./backend
@@ -24,15 +6,10 @@ services:
     container_name: rpg-backend
     networks:
       - rpg-net
-    depends_on:
-      redis-service:
-        condition: service_healthy
-    environment:
-      - GIN_MODE=debug
-      - REDIS_ADDR=redis-service:6379
-      - REDIS_PASSWORD=redis_rpg
+    env_file:
+      - ./backend/.env
     ports:
-      - "8080:8080" # Expõe a porta do backend para o host
+      - "8080:8080"
     restart: unless-stopped
 
   frontend-service:
@@ -42,19 +19,14 @@ services:
     container_name: rpg-frontend
     networks:
       - rpg-net
+    env_file:
+      - ./frontend/.env
     depends_on:
       - backend-service
     ports:
       - "3000:80"
-    # Boa prática: reiniciar o serviço se ele falhar
     restart: unless-stopped
 
-# 'networks' define a rede virtual privada para nossos contêineres
 networks:
   rpg-net:
     driver: bridge
-
-# 'volumes' define os volumes nomeados para persistência de dados
-volumes:
-  redis-data:
-    driver: local

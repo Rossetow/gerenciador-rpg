@@ -5,6 +5,7 @@ import {
     apiGetCampanhaById,
     apiUpdatePersonagem,
     apiDeletePersonagem,
+    apiGetItensByPersonagem,
     apiAddItem,
     apiUpdateItem,
     apiDeleteItem,
@@ -14,200 +15,102 @@ import { useAuth } from '../context/AuthContext';
 import ItemModal from '../components/ItemModal';
 
 // --- Componente do Inventário ---
-// (Movido para este arquivo para simplificar a passagem de props e estado)
-function Inventario({ personagem, onInventoryChange, podeEditar }) {
-    const [newItem, setNewItem] = useState({
-        nome: '',
-        tipo: 'Geral',
-        quantidade: 1,
-        descricao: '',
-        peso: 0,
-        valor: 0,
-        efeitosTexto: '',
-        // Campos opcionais por tipo
-        dano: '',
-        tipo_dano: '',
-        habilidade_requerida: '',
-        valor_defesa: 0,
-        localizacao: ''
-    });
+function Inventario({ personagem, campanha, itens, onInventoryChange, podeEditar }) {
+    const [showAdd, setShowAdd] = useState(false);
+    const [editingItem, setEditingItem] = useState(null); // { item, index }
 
-    const handleAddItem = async () => {
-        if (!newItem.nome.trim()) {
-            alert('O nome do item é obrigatório.');
-            return;
-        }
-
-        // Converte efeitosTexto em mapa { chave: valor }
-        const efeitos = {};
-        if (newItem.efeitosTexto && newItem.efeitosTexto.trim()) {
-            newItem.efeitosTexto.split('\n').forEach(linha => {
-                const idx = linha.indexOf(':');
-                if (idx > -1) {
-                    const k = linha.slice(0, idx).trim();
-                    const v = linha.slice(idx + 1).trim();
-                    if (k) efeitos[k] = v;
-                }
-            });
-        }
-
-        // Monta payload com campos comuns
-        const payload = {
-            nome: newItem.nome.trim(),
-            tipo: newItem.tipo,
-            descricao: newItem.descricao || '',
-            quantidade: parseInt(newItem.quantidade, 10) || 1,
-            peso: parseFloat(newItem.peso) || 0,
-            valor: parseInt(newItem.valor, 10) || 0,
-        };
-
-        if (Object.keys(efeitos).length > 0) {
-            payload.efeitos = efeitos;
-        }
-
-        // Campos específicos por tipo (opcionais)
-        if (newItem.tipo === 'Arma') {
-            if (newItem.dano) payload.dano = newItem.dano;
-            if (newItem.tipo_dano) payload.tipo_dano = newItem.tipo_dano;
-            if (newItem.habilidade_requerida) payload.habilidade_requerida = newItem.habilidade_requerida;
-        } else if (newItem.tipo === 'Armadura') {
-            const vd = parseInt(newItem.valor_defesa, 10);
-            if (!isNaN(vd) && vd > 0) payload.valor_defesa = vd;
-            if (newItem.localizacao) payload.localizacao = newItem.localizacao;
-        }
-
+    const handleSaveItem = async (formData) => {
+        const { tipo, dados } = formData;
         try {
-            await apiAddItem(personagem.id, payload);
-            // Recarrega o personagem para refletir o inventário atualizado
+            if (editingItem) {
+                await apiUpdateItem(personagem.id, editingItem.item.id, tipo, dados);
+                setEditingItem(null);
+            } else {
+                await apiAddItem({
+                    campanha_id: personagem.campanha_id,
+                    personagem_id: personagem.id,
+                    tipo,
+                    dados,
+                });
+                setShowAdd(false);
+            }
             onInventoryChange();
-            // Reset do formulário
-            setNewItem({
-                nome: '',
-                tipo: 'Geral',
-                quantidade: 1,
-                descricao: '',
-                peso: 0,
-                valor: 0,
-                efeitosTexto: '',
-                dano: '',
-                tipo_dano: '',
-                habilidade_requerida: '',
-                valor_defesa: 0,
-                localizacao: ''
-            });
         } catch (error) {
-            alert(`Erro ao adicionar item: ${error.message}`);
+            alert(`Erro ao salvar item: ${error.message}`);
         }
     };
-    
-    const handleDeleteItem = async (itemName) => {
-        if (window.confirm(`Tem certeza que quer deletar o item "${itemName}"?`)) {
+
+    const handleDeleteItem = async (item) => {
+        if (window.confirm(`Tem certeza que quer deletar "${item.dados?.nome || 'este item'}"?`)) {
             try {
-                await apiDeleteItem(personagem.id, itemName);
-                onInventoryChange(); // Re-busca o personagem
+                await apiDeleteItem(personagem.id, item.id);
+                onInventoryChange();
             } catch (error) {
                 alert(`Erro ao deletar item: ${error.message}`);
             }
         }
     };
 
-    // Modal de criação de item
-    const [showAdd, setShowAdd] = useState(false);
-    const handleSaveNewItem = async (formData) => {
-        // Converte efeitosTexto em mapa { chave: valor }
-        const efeitos = {};
-        if (formData.efeitosTexto && String(formData.efeitosTexto).trim()) {
-            String(formData.efeitosTexto).split('\n').forEach((linha) => {
-                const idx = linha.indexOf(':');
-                if (idx > -1) {
-                    const k = linha.slice(0, idx).trim();
-                    const v = linha.slice(idx + 1).trim();
-                    if (k) efeitos[k] = v;
-                }
-            });
-        }
-
-        const payload = {
-            nome: String(formData.nome || '').trim(),
-            tipo: formData.tipo || 'Geral',
-            descricao: formData.descricao || '',
-            quantidade: parseInt(formData.quantidade, 10) || 1,
-            peso: parseFloat(formData.peso) || 0,
-            valor: parseInt(formData.valor, 10) || 0,
-        };
-        if (Object.keys(efeitos).length > 0) {
-            payload.efeitos = efeitos;
-        }
-        if (payload.tipo === 'Arma') {
-            if (formData.dano) payload.dano = formData.dano;
-            if (formData.tipo_dano) payload.tipo_dano = formData.tipo_dano;
-            if (formData.habilidade_requerida) payload.habilidade_requerida = formData.habilidade_requerida;
-        } else if (payload.tipo === 'Armadura') {
-            const vd = parseInt(formData.valor_defesa, 10);
-            if (!isNaN(vd) && vd > 0) payload.valor_defesa = vd;
-            if (formData.localizacao) payload.localizacao = formData.localizacao;
-        }
-
-        try {
-            await apiAddItem(personagem.id, payload);
-            setShowAdd(false);
-            onInventoryChange();
-        } catch (error) {
-            alert(`Erro ao adicionar item: ${error.message}`);
-        }
-    };
-
-
     return (
         <div className="card-inset">
             <h3>Inventário</h3>
             {podeEditar && (
-                <>
-                    <div className="btn-group">
-                        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Adicionar Item</button>
-                    </div>
-                    {showAdd && (
-                        <ItemModal
-                            item={{}}
-                            index={null}
-                            onSave={handleSaveNewItem}
-                            onClose={() => setShowAdd(false)}
-                        />
-                    )}
-                </>
+                <div className="btn-group">
+                    <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Adicionar Item</button>
+                </div>
+            )}
+            {showAdd && (
+                <ItemModal
+                    item={{}}
+                    onSave={handleSaveItem}
+                    onClose={() => setShowAdd(false)}
+                />
+            )}
+            {editingItem && (
+                <ItemModal
+                    item={editingItem.item}
+                    onSave={handleSaveItem}
+                    onClose={() => setEditingItem(null)}
+                />
             )}
             <ul className="inventario-list">
-                {(personagem.inventario || []).map((item, index) => (
-                    <li key={index} className="inventario-item">
-                        <div className="flex-row space-between">
-                            <div>
-                                <span className="item-name">{item.nome} (x{item.quantidade})</span>
-                                <div className="item-meta">
-                                    {item.tipo && <small> Tipo: {item.tipo} </small>}
-                                    {typeof item.peso !== 'undefined' && <small> • Peso: {item.peso} </small>}
-                                    {typeof item.valor !== 'undefined' && <small> • Preço: {item.valor} </small>}
+                {(itens || []).map((item, index) => {
+                    const d = item.dados || {};
+                    return (
+                        <li key={item.id || index} className="inventario-item">
+                            <div className="flex-row space-between">
+                                <div>
+                                    <span className="item-name">{d.nome} (x{d.quantidade ?? 1})</span>
+                                    <div className="item-meta">
+                                        {item.tipo && <small> Tipo: {item.tipo} </small>}
+                                        {typeof d.peso !== 'undefined' && <small> • Peso: {d.peso} </small>}
+                                        {typeof d.valor !== 'undefined' && <small> • Preço: {d.valor} </small>}
+                                    </div>
+                                    {d.descricao && <p>{d.descricao}</p>}
+                                    {item.tipo === 'Arma' && d.dano && (
+                                        <small>Dano: {d.dano}{d.tipo_dano ? ` (${d.tipo_dano})` : ''}{d.habilidade_requerida ? ` • Habilidade: ${d.habilidade_requerida}` : ''}</small>
+                                    )}
+                                    {item.tipo === 'Armadura' && d.valor_defesa > 0 && (
+                                        <small>Defesa: +{d.valor_defesa}{d.localizacao ? ` • Localização: ${d.localizacao}` : ''}</small>
+                                    )}
+                                    {(item.tipo === 'Consumível' || item.tipo === 'Poção') && d.efeito_uso && (
+                                        <small>Efeito: {d.efeito_uso}{d.duracao ? ` (${d.duracao})` : ''}</small>
+                                    )}
+                                    {item.tipo === 'Informação' && d.conteudo && (
+                                        <p><small>{d.conteudo}</small></p>
+                                    )}
+                                    {d.efeitos && <p><small>Efeitos: {d.efeitos}</small></p>}
                                 </div>
-                                {item.descricao && <p>{item.descricao}</p>}
-                                {item.dano && (
-                                    <small>Dano: {item.dano}{item.tipo_dano ? ` (${item.tipo_dano})` : ''}{item.habilidade_requerida ? ` • Habilidade: ${item.habilidade_requerida}` : ''}</small>
-                                )}
-                                {typeof item.valor_defesa !== 'undefined' && item.valor_defesa > 0 && (
-                                    <small> Defesa: +{item.valor_defesa}{item.localizacao ? ` • Localização: ${item.localizacao}` : ''}</small>
-                                )}
-                                {item.efeitos && typeof item.efeitos === 'object' && (
-                                    <ul className="mt-05">
-                                        {Object.entries(item.efeitos).map(([k, v]) => (
-                                            <li key={k}><small>{k}: {String(v)}</small></li>
-                                        ))}
-                                    </ul>
+                                {podeEditar && (
+                                    <div className="btn-group">
+                                        <button onClick={() => setEditingItem({ item, index })} className="btn btn-sm btn-secondary">Editar</button>
+                                        <button onClick={() => handleDeleteItem(item)} className="btn btn-sm btn-delete">X</button>
+                                    </div>
                                 )}
                             </div>
-                            {podeEditar && (
-                                <button onClick={() => handleDeleteItem(item.nome)} className="btn btn-sm btn-delete">X</button>
-                            )}
-                        </div>
-                    </li>
-                ))}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
@@ -219,9 +122,10 @@ function PersonagemFicha() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user, userType } = useAuth();
-    
+
     const [personagem, setPersonagem] = useState(null);
     const [campanha, setCampanha] = useState(null);
+    const [itens, setItens] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -243,9 +147,12 @@ function PersonagemFicha() {
 
     const fetchPersonagemData = useCallback(async () => {
         try {
-            const personagemData = await apiGetPersonagemById(id);
-            if (!personagemData.inventario) personagemData.inventario = [];
+            const [personagemData, itensData] = await Promise.all([
+                apiGetPersonagemById(id),
+                apiGetItensByPersonagem(id),
+            ]);
             setPersonagem(personagemData);
+            setItens(itensData || []);
 
             const campanhaData = await apiGetCampanhaById(personagemData.campanha_id);
             setCampanha(campanhaData);
@@ -261,12 +168,10 @@ function PersonagemFicha() {
         fetchPersonagemData();
     }, [fetchPersonagemData]);
 
-    // Modo de edição da ficha (ativado por botão Editar)
     const [editMode, setEditMode] = useState(false);
     const [draft, setDraft] = useState(null);
 
     const handleFieldChange = (mapName, key, value) => {
-        // Atualiza apenas o rascunho durante a edição
         setDraft(prev => ({
             ...prev,
             [mapName]: {
@@ -280,27 +185,22 @@ function PersonagemFicha() {
         handleFieldChange(mapName, key, parseInt(value, 10) || 0);
     };
 
-    // Atualiza campos numéricos no topo do Personagem (ex.: vida, vida_maxima)
     const handleTopNumberChange = (key, value) => {
         const n = parseInt(value, 10);
-        const safe = isNaN(n) ? 0 : n;
-        setDraft(prev => ({
-            ...prev,
-            [key]: safe,
-        }));
+        setDraft(prev => ({ ...prev, [key]: isNaN(n) ? 0 : n }));
     };
-    
+
     const handleDeleteCharacter = async () => {
-        if(window.confirm(`Tem certeza que quer apagar ${personagem.nome}? Esta ação é irreversível.`)) {
+        if (window.confirm(`Tem certeza que quer apagar ${personagem.nome}? Esta ação é irreversível.`)) {
             try {
                 await apiDeletePersonagem(id);
                 alert("Personagem apagado com sucesso.");
-                navigate('/jogador'); // Volta para o dashboard do jogador
+                navigate('/jogador');
             } catch (err) {
                 alert(`Erro ao apagar personagem: ${err.message}`);
             }
         }
-    }
+    };
 
     const podeEditar = user && (user.id === personagem?.jogador_id || userType === 'mestre');
     const model = editMode && draft ? draft : personagem;
@@ -314,7 +214,7 @@ function PersonagemFicha() {
             <div className="avatar-container">
                 <img
                     className="avatar"
-                    src={personagem.imagem_url ? `http://localhost:8080${personagem.imagem_url}` : 'https://via.placeholder.com/96?text=Avatar'}
+                    src={personagem.imagem_url || 'https://via.placeholder.com/96?text=Avatar'}
                     alt={`Avatar de ${personagem.nome}`}
                 />
                 <div>
@@ -386,7 +286,6 @@ function PersonagemFicha() {
             )}
 
             <div className="stats-grid">
-                {/* Atributos Base */}
                 <div className="card-inset">
                     <h4>Atributos Base</h4>
                     {(campanha.template_atributos_base || []).map(key => (
@@ -402,7 +301,6 @@ function PersonagemFicha() {
                     ))}
                 </div>
 
-                {/* Habilidades */}
                 <div className="card-inset">
                     <h4>Habilidades</h4>
                     {(campanha.template_habilidades || []).map(key => (
@@ -418,7 +316,6 @@ function PersonagemFicha() {
                     ))}
                 </div>
 
-                {/* Outros */}
                 <div className="card-inset">
                     <h4>Outros</h4>
                     {(campanha.template_outros || []).map(key => (
@@ -436,10 +333,12 @@ function PersonagemFicha() {
             </div>
 
             <hr />
-            
-            <Inventario 
-                personagem={personagem} 
-                onInventoryChange={fetchPersonagemData} // Re-busca os dados para ter o inventário mais recente
+
+            <Inventario
+                personagem={personagem}
+                campanha={campanha}
+                itens={itens}
+                onInventoryChange={fetchPersonagemData}
                 podeEditar={podeEditar}
             />
 

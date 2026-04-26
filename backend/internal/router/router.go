@@ -1,6 +1,8 @@
 package router
 
 import (
+	"os"
+
 	"gerenciador-de-fichas/internal/handler"
 
 	"github.com/gin-contrib/cors"
@@ -11,11 +13,13 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// Serve arquivos estáticos de imagens de personagens
-	r.Static("/uploads", "./uploads")
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:3000"
+	}
 
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"} // A origem do seu React
+	config.AllowOrigins = []string{corsOrigin}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type"}
 	r.Use(cors.New(config))
@@ -29,7 +33,6 @@ func SetupRouter() *gin.Engine {
 	{
 		campanhas := api.Group("/campanhas")
 		{
-			campanhas.GET("", handler.GetCampanhas)
 			campanhas.POST("", handler.CreateCampanha)
 			campanhas.GET("/mestre/:mestre_id", handler.GetCampanhasByMestre)
 			campanhas.GET("/jogador/:jogador_id", handler.GetCampanhasByJogador)
@@ -37,11 +40,10 @@ func SetupRouter() *gin.Engine {
 			campanhas.PUT("/:id/template", handler.UpdateCampanhaTemplate)
 			campanhas.GET("/:id/personagens", handler.GetPersonagensByCampanha)
 			campanhas.GET("/:id/jogador/:jogador_id", handler.GetPersonagensByCampanhaJogador)
-
-			// Novas rotas para gerenciamento de jogadores na campanha
 			campanhas.GET("/:id/jogadores", handler.GetJogadoresPorCampanha)
 			campanhas.POST("/:id/jogadores", handler.AdicionarJogadorCampanha)
 			campanhas.DELETE("/:id/jogadores/:jogador_id", handler.RemoverJogadorCampanha)
+			campanhas.GET("/:id/itens", handler.GetItensByCampanha)
 		}
 
 		jogadores := api.Group("/jogadores")
@@ -57,16 +59,12 @@ func SetupRouter() *gin.Engine {
 			personagens.GET("/:id", handler.GetPersonagemByID)
 			personagens.PUT("/:id", handler.UpdatePersonagem)
 			personagens.DELETE("/:id", handler.DeletePersonagem)
-			// Upload de imagem do personagem (multipart/form-data com campo "file")
 			personagens.POST("/:id/imagem", handler.UploadPersonagemImagem)
-
 			personagens.GET("/:id/itens", handler.GetItensByPersonagem)
 			personagens.POST("/:id/itens", handler.AddItem)
-			personagens.PUT("/:id/items", handler.UpdateItem)
-			personagens.DELETE("/:id/items/delete", handler.DeleteItem)
+			personagens.PUT("/:id/itens", handler.UpdateItem)
+			personagens.DELETE("/:id/itens/delete", handler.DeleteItem)
 		}
-		
-
 	}
 
 	return r

@@ -1,50 +1,35 @@
 package model
 
-// LoginRequest é usado para o "login" de identificação.
+// LoginRequest é usado para login e cadastro por nome.
 type LoginRequest struct {
 	Nome string `json:"nome" binding:"required"`
 }
 
-// CampanhaCreateRequest é usado para CRIAR uma nova campanha.
-// Note que não tem ID, templates, etc.
-type CampanhaCreateRequest struct {
-	Nome      string `json:"nome" binding:"required"`
-	MestreID  string `json:"mestre_id" binding:"required"`
-	Descricao string `json:"descricao"`
-}
-
-// TemplateUpdateRequest é usado para ATUALIZAR o template.
+// TemplateUpdateRequest é usado para atualizar o template de uma campanha.
 type TemplateUpdateRequest struct {
 	TemplateAtributosBase []string `json:"template_atributos_base"`
 	TemplateHabilidades   []string `json:"template_habilidades"`
 	TemplateOutros        []string `json:"template_outros"`
 }
 
-// PersonagemCreateRequest é usado para CRIAR um novo personagem.
-type PersonagemCreateRequest struct {
-	Nome          string         `json:"nome" binding:"required"`
-	JogadorID     string         `json:"jogador_id" binding:"required"`
-	CampanhaID    string         `json:"campanha_id" binding:"required"`
-	AtributosBase map[string]int `json:"atributos_base"`
-	Habilidades   map[string]int `json:"habilidades"`
-}
-
-// ItemCreateRequest é usado para criar ou atualizar um item.
-// Ele espera um JSON no formato: {"dados": {...}}
+// ItemCreateRequest é usado para adicionar um item.
+// tipo: "Geral", "Arma", "Armadura", "Consumível", "Poção", "Ferramenta", "Material", "Informação", "Outro"
+// dados: campos específicos do tipo (ver model/item.go)
 type ItemCreateRequest struct {
-	// 'Dados' contém o JSON completo do item (Arma, Armadura, etc.)
-	Item map[string]any `json:"item" binding:"required"`
+	CampanhaID   string         `json:"campanha_id" binding:"required"`
+	PersonagemID *string        `json:"personagem_id"` // nullable
+	Tipo         string         `json:"tipo" binding:"required"`
+	Dados        map[string]any `json:"dados" binding:"required"`
 }
 
+// ItemUpdateRequest usa o UUID do item para identificá-lo.
 type ItemUpdateRequest struct {
-	ItemNome string `json:"nome" binding:"required"`
-	Item map[string]any `json:"item" binding:"required"`
+	ID    string         `json:"id" binding:"required"`
+	Tipo  string         `json:"tipo" binding:"required"`
+	Dados map[string]any `json:"dados" binding:"required"`
 }
 
+// ItemDeleteRequest usa o UUID do item para identificá-lo.
 type ItemDeleteRequest struct {
-	ItemNome string `json:"nome" binding:"required"`
+	ID string `json:"id" binding:"required"`
 }
-
-// Para o PUT (update) do personagem, como o frontend envia o objeto
-// inteiro (incluindo o inventário), continuaremos a fazer o bind
-// direto para a struct 'models.Personagem' principal.

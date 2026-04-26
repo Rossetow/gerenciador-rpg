@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-    apiGetPersonagensByJogador, 
-    apiGetCampanhasByJogador, 
-    apiCreatePersonagem, 
+import {
+    apiGetPersonagensByJogador,
+    apiGetCampanhasByJogador,
+    apiCreatePersonagem,
     apiGetCampanhaById
 } from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -136,7 +136,6 @@ function JogadorDashboard() {
             meusPersonagens.map(p => (
                 <Link to={`/jogador/personagem/${encodeURIComponent(p.id)}`} key={p.id} className="card card-link">
                     <h4>{p.nome}</h4>
-                    <small>Campanha: ID {apiGetCampanhaById().nome}</small> {/* Melhorar isso depois */}
                 </Link>
             ))
           )}

@@ -21,16 +21,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (nome, asRole) => {
     try {
-      let loggedInData;
       if (asRole === 'jogador') {
-        loggedInData = await apiLoginJogador({ nome });
+        await apiLoginJogador({ nome });
       } else if (asRole === 'mestre') {
-        loggedInData = await apiLoginMestre({ nome });
+        await apiLoginMestre({ nome });
       } else {
         throw new Error('Tipo de login inválido.');
       }
-      
-      // A api já salva os dados no localStorage com setUserData
+
       const storedUser = getUserData();
       if (storedUser) {
         setUser(storedUser);
@@ -40,8 +38,7 @@ export const AuthProvider = ({ children }) => {
       return storedUser;
     } catch (error) {
       console.error("Falha no login:", error);
-      // Limpa qualquer estado de login anterior em caso de falha
-      logout(); 
+      logout();
       throw error;
     }
   };

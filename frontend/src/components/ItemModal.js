@@ -1,227 +1,251 @@
 import React, { useState, useEffect } from 'react';
 import './Modal.css';
 
-function ItemModal({ item, index, onSave, onClose }) {
-  // O estado 'formData' guarda as edições
-  const defaultItem = {
+const defaultDados = {
     nome: '',
-    tipo: 'Geral',
     descricao: '',
     quantidade: 1,
     peso: 0,
     valor: 0,
+    efeitos: '',
+    // Arma
     dano: '',
     tipo_dano: '',
+    tipo_arma: '',
     habilidade_requerida: '',
+    // Armadura
     valor_defesa: 0,
     localizacao: '',
-    efeitosTexto: ''
-  };
+    tipo_armadura: '',
+    // Consumível / Poção
+    usos: 1,
+    efeito_uso: '',
+    duracao: '',
+    // Ferramenta
+    bonus_habilidade: '',
+    // Material
+    qualidade: '',
+    uso_craft: '',
+    // Informação
+    conteudo: '',
+    idioma: '',
+};
 
-  const [formData, setFormData] = useState(defaultItem);
+function ItemModal({ item, onSave, onClose }) {
+    const [tipo, setTipo] = useState('Geral');
+    const [dados, setDados] = useState(defaultDados);
 
-  useEffect(() => {
-    // Quando o item (prop) muda, atualiza o estado do formulário
-    setFormData(item && Object.keys(item).length ? item : defaultItem);
-  }, [item]);
+    useEffect(() => {
+        if (item && item.tipo) {
+            setTipo(item.tipo);
+            setDados({ ...defaultDados, ...(item.dados || {}) });
+        } else {
+            setTipo('Geral');
+            setDados(defaultDados);
+        }
+    }, [item]);
 
-  // Handler genérico para atualizar o estado do formulário
-  const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    // Converte números
-    const val = type === 'number' ? parseFloat(value) || 0 : value;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: val,
-    }));
-  };
+    const handleChange = (e) => {
+        const { name, value, type } = e.target;
+        const val = type === 'number' ? parseFloat(value) || 0 : value;
+        setDados(prev => ({ ...prev, [name]: val }));
+    };
 
-  // Handler para campos específicos (Arma, Armadura)
-  const handleSpecificChange = (e) => {
-    // O backend espera que os campos "Item" e "Arma" estejam achatados
-    handleChange(e);
-  };
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave({ tipo, dados });
+    };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData, index);
-  };
+    const renderCommonFields = () => (
+        <>
+            <div className="form-group">
+                <label>Nome do Item</label>
+                <input name="nome" value={dados.nome} onChange={handleChange} required />
+            </div>
 
-  // Renderiza os campos de formulário comuns a TODOS os itens
-  const renderCommonFields = () => (
-    <>
-      <div className="form-group">
-        <label>Nome do Item</label>
-        <input
-          name="nome"
-          value={formData.nome}
-          onChange={handleChange}
-        />
-      </div>
+            <div className="form-group">
+                <label>Tipo</label>
+                <select value={tipo} onChange={e => setTipo(e.target.value)}>
+                    <option value="Geral">Geral</option>
+                    <option value="Arma">Arma</option>
+                    <option value="Armadura">Armadura</option>
+                    <option value="Consumível">Consumível</option>
+                    <option value="Poção">Poção</option>
+                    <option value="Ferramenta">Ferramenta</option>
+                    <option value="Material">Material</option>
+                    <option value="Informação">Informação</option>
+                    <option value="Outro">Outro</option>
+                </select>
+            </div>
 
-      <div className="form-group">
-        <label>Tipo</label>
-        <select
-          name="tipo"
-          value={formData.tipo || 'Geral'}
-          onChange={handleChange}
-        >
-          <option value="Geral">Geral</option>
-          <option value="Arma">Arma</option>
-          <option value="Armadura">Armadura</option>
-          <option value="Consumível">Consumível</option>
-          <option value="Ferramenta">Ferramenta</option>
-          <option value="Material">Material</option>
-          <option value="Poção">Poção</option>
-          <option value="Outro">Outro</option>
-        </select>
-      </div>
+            <div className="form-group">
+                <label>Descrição</label>
+                <textarea name="descricao" value={dados.descricao} onChange={handleChange} />
+            </div>
 
-      <div className="form-group">
-        <label>Descrição</label>
-        <textarea
-          name="descricao"
-          value={formData.descricao}
-          onChange={handleChange}
-        />
-      </div>
+            <div className="form-grid-3">
+                <div className="form-group">
+                    <label>Quantidade</label>
+                    <input name="quantidade" type="number" value={dados.quantidade} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                    <label>Peso</label>
+                    <input name="peso" type="number" value={dados.peso} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                    <label>Valor</label>
+                    <input name="valor" type="number" value={dados.valor} onChange={handleChange} />
+                </div>
+            </div>
+        </>
+    );
 
-      <div className="form-grid-3">
+    const renderArmaFields = () => (
+        <>
+            <div className="form-grid-3">
+                <div className="form-group">
+                    <label>Tipo de Arma</label>
+                    <input name="tipo_arma" value={dados.tipo_arma || ''} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                    <label>Habilidade</label>
+                    <input name="habilidade_requerida" value={dados.habilidade_requerida || ''} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                    <label>Dano</label>
+                    <input name="dano" value={dados.dano || ''} onChange={handleChange} placeholder="ex: 1d8" />
+                </div>
+            </div>
+            <div className="form-group">
+                <label>Tipo de Dano</label>
+                <input name="tipo_dano" value={dados.tipo_dano || ''} onChange={handleChange} placeholder="ex: cortante" />
+            </div>
+        </>
+    );
+
+    const renderArmaduraFields = () => (
+        <div className="form-grid-3">
+            <div className="form-group">
+                <label>Valor de Defesa</label>
+                <input name="valor_defesa" type="number" value={dados.valor_defesa || 0} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+                <label>Localização</label>
+                <input name="localizacao" value={dados.localizacao || ''} onChange={handleChange} placeholder="ex: peito" />
+            </div>
+            <div className="form-group">
+                <label>Tipo de Armadura</label>
+                <input name="tipo_armadura" value={dados.tipo_armadura || ''} onChange={handleChange} placeholder="ex: leve" />
+            </div>
+        </div>
+    );
+
+    const renderConsumivelFields = () => (
+        <div className="form-grid-2">
+            <div className="form-group">
+                <label>Usos</label>
+                <input name="usos" type="number" value={dados.usos || 1} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+                <label>Efeito ao usar</label>
+                <input name="efeito_uso" value={dados.efeito_uso || ''} onChange={handleChange} />
+            </div>
+        </div>
+    );
+
+    const renderPocaoFields = () => (
+        <div className="form-grid-3">
+            <div className="form-group">
+                <label>Usos</label>
+                <input name="usos" type="number" value={dados.usos || 1} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+                <label>Efeito ao usar</label>
+                <input name="efeito_uso" value={dados.efeito_uso || ''} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+                <label>Duração</label>
+                <input name="duracao" value={dados.duracao || ''} onChange={handleChange} placeholder="ex: 1 hora" />
+            </div>
+        </div>
+    );
+
+    const renderFerramentaFields = () => (
+        <div className="form-grid-2">
+            <div className="form-group">
+                <label>Habilidade Requerida</label>
+                <input name="habilidade_requerida" value={dados.habilidade_requerida || ''} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+                <label>Bônus de Habilidade</label>
+                <input name="bonus_habilidade" value={dados.bonus_habilidade || ''} onChange={handleChange} placeholder="ex: +2" />
+            </div>
+        </div>
+    );
+
+    const renderMaterialFields = () => (
+        <div className="form-grid-2">
+            <div className="form-group">
+                <label>Qualidade</label>
+                <input name="qualidade" value={dados.qualidade || ''} onChange={handleChange} placeholder="ex: bruto, refinado" />
+            </div>
+            <div className="form-group">
+                <label>Uso de Craft</label>
+                <input name="uso_craft" value={dados.uso_craft || ''} onChange={handleChange} placeholder="ex: Barra de Ferro" />
+            </div>
+        </div>
+    );
+
+    const renderInformacaoFields = () => (
+        <>
+            <div className="form-group">
+                <label>Idioma</label>
+                <input name="idioma" value={dados.idioma || ''} onChange={handleChange} placeholder="ex: Comum, Élfico" />
+            </div>
+            <div className="form-group">
+                <label>Conteúdo</label>
+                <textarea name="conteudo" value={dados.conteudo || ''} onChange={handleChange} placeholder="O texto ou informação do item..." rows={4} />
+            </div>
+        </>
+    );
+
+    const renderEfeitos = () => (
         <div className="form-group">
-          <label>Quantidade</label>
-          <input
-            name="quantidade"
-            type="number"
-            value={formData.quantidade}
-            onChange={handleChange}
-          />
+            <label>Efeitos (texto livre)</label>
+            <textarea
+                name="efeitos"
+                value={dados.efeitos || ''}
+                onChange={handleChange}
+                placeholder="Ex: veneno: 1d4 por rodada&#10;luz: 10m"
+            />
         </div>
-        <div className="form-group">
-          <label>Peso</label>
-          <input
-            name="peso"
-            type="number"
-            value={formData.peso}
-            onChange={handleChange}
-          />
-        </div>
-        <div className="form-group">
-          <label>Valor</label>
-          <input
-            name="valor"
-            type="number"
-            value={formData.valor}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
-    </>
-  );
+    );
 
-  // Renderiza campos específicos para 'Arma'
-  const renderArmaFields = () => (
-    <>
-      <div className="form-grid-3">
-        <div className="form-group">
-          <label>Tipo de Arma</label>
-          <input
-            name="tipo_arma"
-            value={formData.tipo_arma || ''}
-            onChange={handleSpecificChange}
-          />
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>{item?.tipo ? 'Editar Item' : 'Adicionar Item'}</h2>
+                    <button onClick={onClose} className="modal-close-btn">&times;</button>
+                </div>
+                <form onSubmit={handleSubmit} className="modal-body">
+                    {renderCommonFields()}
+                    {tipo === 'Arma' && renderArmaFields()}
+                    {tipo === 'Armadura' && renderArmaduraFields()}
+                    {tipo === 'Consumível' && renderConsumivelFields()}
+                    {tipo === 'Poção' && renderPocaoFields()}
+                    {tipo === 'Ferramenta' && renderFerramentaFields()}
+                    {tipo === 'Material' && renderMaterialFields()}
+                    {tipo === 'Informação' && renderInformacaoFields()}
+                    {tipo !== 'Informação' && renderEfeitos()}
+                    <div className="btn-group">
+                        <button type="submit" className="btn btn-primary">Salvar</button>
+                        <button type="button" onClick={onClose} className="btn btn-link">Cancelar</button>
+                    </div>
+                </form>
+            </div>
         </div>
-        <div className="form-group">
-          <label>Habilidade</label>
-          <input
-            name="habilidade_requerida"
-            value={formData.habilidade_requerida || ''}
-            onChange={handleSpecificChange}
-          />
-        </div>
-        <div className="form-group">
-          <label>Dano</label>
-          <input
-            name="dano"
-            value={formData.dano || ''}
-            onChange={handleSpecificChange}
-          />
-        </div>
-      </div>
-      <div className="form-group">
-        <label>Tipo de Dano</label>
-        <input
-          name="tipo_dano"
-          value={formData.tipo_dano || ''}
-          onChange={handleSpecificChange}
-        />
-      </div>
-    </>
-  );
-
-  // Renderiza campos específicos para 'Armadura'
-  const renderArmaduraFields = () => (
-    <>
-      <div className="form-grid-2">
-        <div className="form-group">
-          <label>Valor de Defesa</label>
-          <input
-            name="valor_defesa"
-            type="number"
-            value={formData.valor_defesa || 0}
-            onChange={handleSpecificChange}
-          />
-        </div>
-        <div className="form-group">
-          <label>Localização</label>
-          <input
-            name="localizacao"
-            value={formData.localizacao || ''}
-            onChange={handleSpecificChange}
-          />
-        </div>
-      </div>
-    </>
-  );
-  
-  // Editor simples para Efeitos (um por linha: "chave: valor")
-  const renderEfeitos = () => (
-    <div className="form-group">
-      <label>Efeitos (um por linha: "chave: valor")</label>
-      <textarea
-        name="efeitosTexto"
-        value={formData.efeitosTexto || ''}
-        onChange={handleChange}
-        placeholder={"Ex:\nveneno: 1d4 por rodada\nluz: 10m"}
-      />
-    </div>
-  );
-
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{formData?.nome ? 'Editar Item' : 'Adicionar Item'}</h2>
-          <button onClick={onClose} className="modal-close-btn">&times;</button>
-        </div>
-        <form onSubmit={handleSubmit} className="modal-body">
-          {renderCommonFields()}
-
-          {/* Renderização Dinâmica baseada no TIPO */}
-          {formData.tipo === 'Arma' && renderArmaFields()}
-          {formData.tipo === 'Armadura' && renderArmaduraFields()}
-          {/* 'Consumível' não tem campos extras além dos Efeitos */}
-
-          {renderEfeitos()}
-          
-          <div className="btn-group">
-            <button type="submit" className="btn btn-primary">Salvar Alterações</button>
-            <button type="button" onClick={onClose} className="btn btn-link">Cancelar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default ItemModal;

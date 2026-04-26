@@ -1,4 +1,3 @@
-// /cmd/server/main.go
 package main
 
 import (
@@ -8,10 +7,10 @@ import (
 )
 
 func main() {
-	storage.NewMemoryStorage()
+	storage.NewPostgresStorage()
 
-	router := router.SetupRouter()
+	r := router.SetupRouter()
 
 	fmt.Println("Servidor Gin rodando em http://localhost:8080")
-	router.Run(":8080")
+	r.Run(":8080")
 }

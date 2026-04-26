@@ -17,13 +17,7 @@ function LoginPage() {
     if (!nome || !role) return;
     setLoading(true);
     try {
-      var user;
-      await setNome(role === "mestre" ? nome + " - Mestre" : nome);
-      if (role === 'mestre') {
-        user = await login(nome + " - Mestre", role);
-      } else {
-        user = await login(nome, role);
-      }
+      const user = await login(nome, role);
       if (user?.id) {
         navigate(user.userType === 'mestre' ? '/mestre' : '/jogador');
       } else {
@@ -42,14 +36,8 @@ function LoginPage() {
     setLoading(true);
     try {
       const apiCall = role === 'jogador' ? apiCadastroJogador : apiCadastroMestre;
-    if (role === 'mestre') {
-      await apiCall({ nome: nome + " - Mestre" });
-    } else {
       await apiCall({ nome });
-    }
-
       alert(`Usuário '${nome}' cadastrado com sucesso como ${role}! Agora você pode fazer o login.`);
-      // Reseta para a tela de login
       setIsSigningUp(false);
       setNome('');
     } catch (error) {

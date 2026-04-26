@@ -1,45 +1,39 @@
 package service
 
 import (
-	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"gerenciador-de-fichas/internal/model"
 	"gerenciador-de-fichas/internal/storage"
 )
 
-// --- JOGADOR ---
+// --- USUARIOS ---
 
-func GetJogador(nome string) (model.Jogador, error) {
-	idJogador := base64.StdEncoding.EncodeToString([]byte(nome))
-	return storage.GetJogador(idJogador)
+func GetJogador(nome string) (model.Usuario, error) {
+	return storage.GetJogador(nome)
 }
 
-func CreateJogador(nome string) (model.Jogador, error) {
-	novoJogador := model.NovoJogador(nome)
-	return storage.SetNovoJogador(novoJogador)
+func CreateJogador(nome string) (model.Usuario, error) {
+	return storage.SetNovoJogador(nome)
 }
 
-func GetMestre(nome string) (model.Jogador, error) {
-	idJogador := base64.StdEncoding.EncodeToString([]byte(nome))
-	return storage.GetMestre(idJogador)
+func GetMestre(nome string) (model.Usuario, error) {
+	return storage.GetMestre(nome)
 }
 
-func CreateMestre(nome string) (model.Jogador, error) {
-	novoJogador := model.NovoJogador(nome)
-	return storage.SetNovoMestre(novoJogador)
+func CreateMestre(nome string) (model.Usuario, error) {
+	return storage.SetNovoMestre(nome)
 }
 
-func GetAllJogadores() ([]model.Jogador, error) {
+func GetAllJogadores() ([]model.Usuario, error) {
 	return storage.GetAllJogadores()
 }
 
-func GetJogadorByID(id string) (model.Jogador, error) {
-	return storage.GetJogador(id)
+func GetJogadorByID(id string) (model.Usuario, error) {
+	return storage.GetJogadorByID(id)
 }
-// --- CAMPANHAS ---
 
-func GetCampanhas() ([]model.Campanha, error) {
-	return storage.GetCampanhas()
-}
+// --- CAMPANHAS ---
 
 func GetCampanhasByMestre(mestreID string) ([]model.Campanha, error) {
 	return storage.GetCampanhasByMestre(mestreID)
@@ -50,9 +44,6 @@ func GetCampanhasByJogador(jogadorID string) ([]model.Campanha, error) {
 }
 
 func CreateCampanha(campanha model.Campanha) (model.Campanha, error) {
-	
-	campanha.ID = model.NewUUID()
-
 	return storage.CreateCampanha(campanha)
 }
 
@@ -73,15 +64,13 @@ func UpdateCampanhaTemplate(idCampanha string, templateAtributosBase, templateHa
 	if err != nil {
 		return err
 	}
-
 	campanha.TemplateAtributosBase = templateAtributosBase
 	campanha.TemplateHabilidades = templateHabilidades
 	campanha.TemplateOutros = templateOutros
-
 	return storage.UpdateTemplateCampanha(campanha)
 }
 
-func GetJogadoresPorCampanha(campanhaID string) ([]model.Jogador, error) {
+func GetJogadoresPorCampanha(campanhaID string) ([]model.Usuario, error) {
 	return storage.GetJogadoresPorCampanha(campanhaID)
 }
 
@@ -100,18 +89,12 @@ func GetPersonagensByJogador(jogadorID string) ([]model.Personagem, error) {
 }
 
 func CreatePersonagem(req model.Personagem) (model.Personagem, error) {
-	novoPersonagem := model.NewPersonagem(
-		req.Nome,
-		req.JogadorID,
-		req.CampanhaID,
-	)
-	// Copia campos adicionais quando informados na criação
+	novoPersonagem := model.NewPersonagem(req.Nome, req.JogadorID, req.CampanhaID)
 	novoPersonagem.DescricaoFisica = req.DescricaoFisica
 	novoPersonagem.Caracteristicas = req.Caracteristicas
 	novoPersonagem.Vida = req.Vida
 	novoPersonagem.VidaMaxima = req.VidaMaxima
 	novoPersonagem.ImagemURL = req.ImagemURL
-
 	return storage.CreatePersonagem(novoPersonagem)
 }
 
@@ -120,8 +103,6 @@ func GetPersonagemByID(id string) (model.Personagem, error) {
 }
 
 func UpdatePersonagem(req model.Personagem) error {
-	// Lógica de negócio:
-	// Ex: recalcular atributos, checar se o inventário é válido, etc.
 	return storage.UpdatePersonagem(req)
 }
 
@@ -135,49 +116,70 @@ func GetItensByPersonagem(personagemID string) ([]model.Item, error) {
 	return storage.GetItensByPersonagem(personagemID)
 }
 
-func AddItem(personagemID string, item map[string]any) (error) {
-	personagem, err := storage.GetPersonagemByID(personagemID)
-	if err != nil {
-		return err
-	}
-
-	personagem.Inventario = append(personagem.Inventario, item)
-
-	return storage.UpdatePersonagem(personagem)
+func GetItensByCampanha(campanhaID string) ([]model.Item, error) {
+	return storage.GetItensByCampanha(campanhaID)
 }
 
-func UpdateItem(personagemID, itemNome string, item map[string]any) error {
-	personagem, err := storage.GetPersonagemByID(personagemID)
+// normalizeDados deserialises the incoming dados map into the correct typed struct
+// for the given tipo, then re-serialises it back to map[string]any.
+// This strips unknown fields and ensures only valid fields for the type are stored.
+func normalizeDados(tipo string, dados map[string]any) (map[string]any, error) {
+	raw, err := json.Marshal(dados)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for i := 0; i < len(personagem.Inventario); i++ {
-		if nome, ok := personagem.Inventario[i]["Nome"].(string); !ok || nome == "" {
-			if nome == itemNome {
-				personagem.Inventario[i] = item
-			}
-		}
+	var typed any
+	switch tipo {
+	case "Arma":
+		typed = &model.ItemArma{}
+	case "Armadura":
+		typed = &model.ItemArmadura{}
+	case "Consumível":
+		typed = &model.ItemConsumivel{}
+	case "Poção":
+		typed = &model.ItemPocao{}
+	case "Ferramenta":
+		typed = &model.ItemFerramenta{}
+	case "Material":
+		typed = &model.ItemMaterial{}
+	case "Informação":
+		typed = &model.ItemInformacao{}
+	default:
+		// Geral / Outro — use base fields only
+		typed = &model.ItemBase{}
 	}
 
+	if err := json.Unmarshal(raw, typed); err != nil {
+		return nil, fmt.Errorf("dados inválidos para tipo %q: %w", tipo, err)
+	}
 
-	return storage.UpdatePersonagem(personagem)
+	normalized, err := json.Marshal(typed)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]any
+	json.Unmarshal(normalized, &result)
+	return result, nil
 }
 
-func DeleteItem(personagemID, itemNome string) error {
-		personagem, err := storage.GetPersonagemByID(personagemID)
+func AddItem(campanhaID string, personagemID *string, tipo string, dados map[string]any) (model.Item, error) {
+	normalized, err := normalizeDados(tipo, dados)
+	if err != nil {
+		return model.Item{}, err
+	}
+	return storage.AddItem(campanhaID, personagemID, tipo, normalized)
+}
+
+func UpdateItem(itemID, tipo string, dados map[string]any) error {
+	normalized, err := normalizeDados(tipo, dados)
 	if err != nil {
 		return err
 	}
+	return storage.UpdateItem(itemID, tipo, normalized)
+}
 
-	for i := 0; i < len(personagem.Inventario); i++ {
-		if nome, ok := personagem.Inventario[i]["Nome"].(string); !ok || nome == "" {
-			if nome == itemNome {
-				personagem.Inventario[i] = nil
-			}
-		}
-	}
-
-
-	return storage.UpdatePersonagem(personagem)
+func DeleteItem(itemID string) error {
+	return storage.DeleteItem(itemID)
 }

@@ -1,26 +1,13 @@
 // /src/api/api.js
-// Conexão real com a API Go.
 
-// --- Configuração ---
-// No ambiente Docker, o frontend acessará o backend pelo nome do serviço.
-// A porta 8080 é a porta interna do container do backend.
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-// --- Helpers de "Autenticação" ---
-// O backend atual não usa tokens, então apenas guardamos os dados do usuário.
+// --- Auth helpers ---
 
-/**
- * Salva os dados do usuário logado no localStorage.
- * @param {object} userData
- */
-const setUserData = (userData) => {
+export const setUserData = (userData) => {
     localStorage.setItem('userData', JSON.stringify(userData));
 };
 
-/**
- * Pega os dados do usuário do localStorage.
- * @returns {object | null}
- */
 export const getUserData = () => {
     try {
         return JSON.parse(localStorage.getItem('userData'));
@@ -29,253 +16,169 @@ export const getUserData = () => {
     }
 };
 
-/**
- * Remove os dados do usuário do localStorage (para logout).
- */
 export const clearAuthData = () => {
     localStorage.removeItem('userData');
 };
 
+// --- Core fetch wrapper ---
 
-// --- Helper Principal de Fetch ---
-
-/**
- * Função central para fazer chamadas à API.
- * @param {string} endpoint O caminho do endpoint (ex: '/api/campanhas')
- * @param {RequestInit} options Opções do Fetch (method, body, etc.)
- * @returns {Promise<any>} O JSON da resposta
- */
 const apiFetch = async (endpoint, options = {}) => {
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
     };
 
-    // Converte o body para JSON se ele existir
     if (options.body) {
         options.body = JSON.stringify(options.body);
     }
 
     try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
-            ...options,
-            headers,
-        });
+        const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
-        // Trata erros da API
         if (!response.ok) {
-            // Tenta pegar a mensagem de erro do corpo da resposta
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.error || response.statusText || 'Erro desconhecido na API';
-            throw new Error(errorMessage);
+            throw new Error(errorData.error || response.statusText || 'Erro desconhecido na API');
         }
 
-        // Trata respostas sem conteúdo (ex: DELETE)
-        if (response.status === 204) {
-            return null;
-        }
+        if (response.status === 204) return null;
 
-        // Retorna o JSON da resposta
         return response.json();
-
     } catch (error) {
         console.error('Erro na chamada da API:', error);
-        throw error; // Propaga o erro para quem chamou
+        throw error;
     }
 };
 
-// --- Funções da API (Mapeadas do router.go) ---
-
-// --- API de "Autenticação" ---
-// O login é feito apenas com o 'nome'
+// --- Auth ---
 
 export const apiLoginJogador = async (credentials) => {
-    // credentials é esperado como { nome: '...' }
-    const data = await apiFetch('/jogador/login', {
-        method: 'POST',
-        body: credentials,
-    });
-    setUserData({ ...data, userType: 'jogador' }); // Salva os dados do jogador
+    const data = await apiFetch('/jogador/login', { method: 'POST', body: credentials });
+    setUserData({ ...data, userType: 'jogador' });
     return data;
 };
 
-export const apiCadastroJogador = (jogadorData) => {
-    // jogadorData é esperado como { nome: '...' }
-    return apiFetch('/jogador/cadastro', {
-        method: 'POST',
-        body: jogadorData,
-    });
+export const apiCadastroJogador = async (jogadorData) => {
+    const data = await apiFetch('/jogador/cadastro', { method: 'POST', body: jogadorData });
+    setUserData({ ...data, userType: 'jogador' });
+    return data;
 };
 
 export const apiLoginMestre = async (credentials) => {
-    // credentials é esperado como { nome: '...' }
-    const data = await apiFetch('/mestre/login', {
-        method: 'POST',
-        body: credentials,
-    });
-    setUserData({ ...data, userType: 'mestre' }); // Salva os dados do mestre
+    const data = await apiFetch('/mestre/login', { method: 'POST', body: credentials });
+    setUserData({ ...data, userType: 'mestre' });
     return data;
 };
 
-export const apiCadastroMestre = (mestreData) => {
-    return apiFetch('/mestre/cadastro', {
-        method: 'POST',
-        body: mestreData,
-    });
+export const apiCadastroMestre = async (mestreData) => {
+    const data = await apiFetch('/mestre/cadastro', { method: 'POST', body: mestreData });
+    setUserData({ ...data, userType: 'mestre' });
+    return data;
 };
 
-// --- API de Jogadores ---
+// --- Jogadores ---
 
-export const apiGetAllJogadores = () => {
-    return apiFetch('/api/jogadores');
-};
+export const apiGetAllJogadores = () => apiFetch('/api/jogadores');
 
-export const apiGetJogadorById = (id) => {
-    return apiFetch(`/api/jogadores/${encodeURIComponent(id)}`);
-};
+export const apiGetJogadorById = (id) => apiFetch(`/api/jogadores/${encodeURIComponent(id)}`);
 
+// --- Campanhas ---
 
-// --- API de Campanhas ---
+export const apiGetCampanhaById = (id) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(id)}`);
 
-export const apiGetCampanhas = () => {
-    return apiFetch('/api/campanhas'); // GET é o padrão
-};
+export const apiGetCampanhasByMestre = (mestreId) =>
+    apiFetch(`/api/campanhas/mestre/${encodeURIComponent(mestreId)}`);
 
-export const apiGetCampanhaById = (id) => {
-    return apiFetch(`/api/campanhas/${encodeURIComponent(id)}`);
-};
+export const apiGetCampanhasByJogador = (jogadorId) =>
+    apiFetch(`/api/campanhas/jogador/${encodeURIComponent(jogadorId)}`);
 
-export const apiGetCampanhasByMestre = (mestreId) => {
-    return apiFetch(`/api/campanhas/mestre/${encodeURIComponent(mestreId)}`);
-};
+export const apiGetJogadoresPorCampanha = (campanhaId) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores`);
 
-export const apiGetCampanhasByJogador = (jogadorId) => {
-    return apiFetch(`/api/campanhas/jogador/${encodeURIComponent(jogadorId)}`);
-};
-
-export const apiGetJogadoresPorCampanha = (campanhaId) => {
-    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores`);
-};
-
-export const apiAdicionarJogador = (campanhaId, jogadorId) => {
-    return apiFetch(`/api/campanhas/${campanhaId}/jogadores`, {
+export const apiAdicionarJogador = (campanhaId, jogadorId) =>
+    apiFetch(`/api/campanhas/${campanhaId}/jogadores`, {
         method: 'POST',
         body: { jogador_id: jogadorId },
     });
-};
 
-export const apiRemoverJogador = (campanhaId, jogadorId) => {
-    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores/${encodeURIComponent(jogadorId)}`, {
+export const apiRemoverJogador = (campanhaId, jogadorId) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores/${encodeURIComponent(jogadorId)}`, {
         method: 'DELETE',
     });
-};
 
-export const apiCreateCampanha = (data) => {
-    // data = { nome: "...", descricao: "...", mestre_id: "..." }
-    // O mestre_id provavelmente virá do token no backend, mas mantendo caso seja explícito
-    return apiFetch('/api/campanhas', {
+export const apiCreateCampanha = (data) =>
+    apiFetch('/api/campanhas', { method: 'POST', body: data });
+
+export const apiUpdateCampanhaTemplate = (id, templateData) =>
+    apiFetch(`/api/campanhas/${id}/template`, { method: 'PUT', body: templateData });
+
+export const apiGetPersonagensByCampanha = (campanhaId) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/personagens`);
+
+export const apiGetPersonagensByCampanhaJogador = (campanhaId, jogadorId) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogador/${encodeURIComponent(jogadorId)}`);
+
+// --- Personagens ---
+
+export const apiGetPersonagensByJogador = (jogadorId) =>
+    apiFetch(`/api/personagens/jogador/${encodeURIComponent(jogadorId)}`);
+
+export const apiGetPersonagemById = (id) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(id)}`);
+
+export const apiCreatePersonagem = (data) =>
+    apiFetch('/api/personagens', { method: 'POST', body: data });
+
+export const apiUpdatePersonagem = (id, data) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(id)}`, { method: 'PUT', body: data });
+
+export const apiDeletePersonagem = (id) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+// --- Itens ---
+// Item shape sent to the API: { campanha_id, personagem_id (optional), tipo, dados: { nome, descricao, ... } }
+// Item shape received from the API: { id, campanha_id, personagem_id, tipo, dados: { ... } }
+
+export const apiGetItensByPersonagem = (personagemId) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`);
+
+export const apiGetItensByCampanha = (campanhaId) =>
+    apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/itens`);
+
+// itemData = { campanha_id, personagem_id (optional), tipo, dados }
+export const apiAddItem = (itemData) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(itemData.personagem_id || '')}/itens`, {
         method: 'POST',
-        body: data,
+        body: itemData,
     });
-};
 
-/**
- * ATENÇÃO: Seu router.go tem um endpoint para ATUALIZAR O TEMPLATE,
- * não a campanha inteira como o mock fazia.
- * @param {string} id - ID da Campanha
- * @param {object} templateData - O objeto de template
- */
-export const apiUpdateCampanhaTemplate = (id, templateData) => {
-    return apiFetch(`/api/campanhas/${id}/template`, {
+// Uses item UUID — no longer name-based
+export const apiUpdateItem = (personagemId, itemId, tipo, dados) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`, {
         method: 'PUT',
-        body: templateData,
+        body: { id: itemId, tipo, dados },
     });
-};
 
-export const apiGetPersonagensByCampanha = (campanhaId) => {
-    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/personagens`);
-};
-
-export const apiGetPersonagensByCampanhaJogador = (campanhaId, jogadorId) => {
-    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogador/${encodeURIComponent(jogadorId)}`);
-};
-
-
-// --- API de Personagens ---
-
-export const apiGetPersonagensByJogador = (jogadorId) => {
-    return apiFetch(`/api/personagens/jogador/${encodeURIComponent(jogadorId)}`);
-};
-
-export const apiGetPersonagemById = (id) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`);
-};
-
-export const apiCreatePersonagem = (data) => {
-    return apiFetch('/api/personagens', {
-        method: 'POST',
-        body: data,
-    });
-};
-
-export const apiUpdatePersonagem = (id, data) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        body: data,
-    });
-};
-
-export const apiDeletePersonagem = (id) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`, {
+export const apiDeleteItem = (personagemId, itemId) =>
+    apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens/delete`, {
         method: 'DELETE',
+        body: { id: itemId },
     });
-};
 
+// --- Imagem ---
 
-// --- API de Itens (Novo) ---
-
-export const apiGetItensByPersonagem = (personagemId) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`);
-};
-
-export const apiAddItem = (personagemId, itemData) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`, {
-        method: 'POST',
-        // O backend espera o body: { "item": { ... } }
-        body: { item: itemData },
-    });
-};
-
-export const apiUpdateItem = (personagemId, itemName, itemData) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/items`, { // Endpoint corrigido: /items
-        method: 'PUT',
-        // O backend espera: { "nome": "nome_do_item_antigo", "item": { ... } }
-        body: { nome: itemName, item: itemData },
-    });
-};
-
-export const apiDeleteItem = (personagemId, itemName) => {
-    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/items/delete`, { // Endpoint corrigido: /items/delete
-        method: 'DELETE',
-        // O backend espera: { "nome": "nome_do_item" }
-        body: { nome: itemName },
-    });
-};
-
-// --- API de Imagem do Personagem ---
 export const apiUploadPersonagemImagem = async (id, file) => {
     const formData = new FormData();
     formData.append('file', file);
 
     const response = await fetch(`${BASE_URL}/api/personagens/${encodeURIComponent(id)}/imagem`, {
         method: 'POST',
-        body: formData, // Não definir Content-Type manualmente (o browser define com boundary)
+        body: formData,
     });
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const msg = errorData.error || response.statusText || 'Falha no upload da imagem';
-        throw new Error(msg);
+        throw new Error(errorData.error || response.statusText || 'Falha no upload da imagem');
     }
     return response.json(); // { imagem_url: string }
 };
