@@ -42,6 +42,19 @@ func NewPostgresStorage() {
 	fmt.Println("Connected to PostgreSQL")
 }
 
+// marshalJSON serializes v to a JSON string safe for JSONB columns in simple protocol mode.
+// pgx simple protocol sends []byte as bytea — must use string for JSONB.
+func marshalJSON(v any) string {
+	if v == nil {
+		return "{}"
+	}
+	b, err := json.Marshal(v)
+	if err != nil || string(b) == "null" {
+		return "{}"
+	}
+	return string(b)
+}
+
 // --- USUARIOS ---
 
 func GetJogador(nome string) (model.Usuario, error) {
@@ -238,19 +251,16 @@ func RemoverJogadorCampanha(campanhaID, jogadorID string) error {
 // --- PERSONAGENS ---
 
 func CreatePersonagem(p model.Personagem) (model.Personagem, error) {
-	atributosJSON, _ := json.Marshal(p.AtributosBase)
-	habilidadesJSON, _ := json.Marshal(p.Habilidades)
-	outrosJSON, _ := json.Marshal(p.Outros)
-
 	var result model.Personagem
-	var atributosRaw, habilidadesRaw, outrosRaw []byte
+	var atributosRaw, habilidadesRaw, outrosRaw string
 
 	err := pool.QueryRow(context.Background(),
 		`INSERT INTO personagens (nome, jogador_id, campanha_id, descricao_fisica, caracteristicas, vida, vida_maxima, imagem_url, atributos_base, habilidades, outros)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING id, nome, jogador_id, campanha_id, descricao_fisica, caracteristicas, vida, vida_maxima, imagem_url, atributos_base, habilidades, outros`,
 		p.Nome, p.JogadorID, p.CampanhaID, p.DescricaoFisica, p.Caracteristicas,
-		p.Vida, p.VidaMaxima, p.ImagemURL, atributosJSON, habilidadesJSON, outrosJSON,
+		p.Vida, p.VidaMaxima, p.ImagemURL,
+		marshalJSON(p.AtributosBase), marshalJSON(p.Habilidades), marshalJSON(p.Outros),
 	).Scan(
 		&result.ID, &result.Nome, &result.JogadorID, &result.CampanhaID,
 		&result.DescricaoFisica, &result.Caracteristicas,
@@ -261,16 +271,16 @@ func CreatePersonagem(p model.Personagem) (model.Personagem, error) {
 		return model.Personagem{}, fmt.Errorf("erro ao criar personagem: %w", err)
 	}
 
-	json.Unmarshal(atributosRaw, &result.AtributosBase)
-	json.Unmarshal(habilidadesRaw, &result.Habilidades)
-	json.Unmarshal(outrosRaw, &result.Outros)
+	json.Unmarshal([]byte(atributosRaw), &result.AtributosBase)
+	json.Unmarshal([]byte(habilidadesRaw), &result.Habilidades)
+	json.Unmarshal([]byte(outrosRaw), &result.Outros)
 
 	return result, nil
 }
 
 func GetPersonagemByID(id string) (model.Personagem, error) {
 	var p model.Personagem
-	var atributosRaw, habilidadesRaw, outrosRaw []byte
+	var atributosRaw, habilidadesRaw, outrosRaw string
 
 	err := pool.QueryRow(context.Background(),
 		`SELECT id, nome, jogador_id, campanha_id, descricao_fisica, caracteristicas, vida, vida_maxima, imagem_url, atributos_base, habilidades, outros
@@ -285,9 +295,9 @@ func GetPersonagemByID(id string) (model.Personagem, error) {
 		return model.Personagem{}, fmt.Errorf("personagem não encontrado: %w", err)
 	}
 
-	json.Unmarshal(atributosRaw, &p.AtributosBase)
-	json.Unmarshal(habilidadesRaw, &p.Habilidades)
-	json.Unmarshal(outrosRaw, &p.Outros)
+	json.Unmarshal([]byte(atributosRaw), &p.AtributosBase)
+	json.Unmarshal([]byte(habilidadesRaw), &p.Habilidades)
+	json.Unmarshal([]byte(outrosRaw), &p.Outros)
 
 	return p, nil
 }
@@ -329,17 +339,13 @@ func GetPersonagensByCampanhaJogador(campanhaID, jogadorID string) ([]model.Pers
 }
 
 func UpdatePersonagem(p model.Personagem) error {
-	atributosJSON, _ := json.Marshal(p.AtributosBase)
-	habilidadesJSON, _ := json.Marshal(p.Habilidades)
-	outrosJSON, _ := json.Marshal(p.Outros)
-
 	_, err := pool.Exec(context.Background(),
 		`UPDATE personagens
 		 SET nome=$1, descricao_fisica=$2, caracteristicas=$3, vida=$4, vida_maxima=$5, imagem_url=$6,
 		     atributos_base=$7, habilidades=$8, outros=$9
 		 WHERE id=$10`,
 		p.Nome, p.DescricaoFisica, p.Caracteristicas, p.Vida, p.VidaMaxima, p.ImagemURL,
-		atributosJSON, habilidadesJSON, outrosJSON, p.ID,
+		marshalJSON(p.AtributosBase), marshalJSON(p.Habilidades), marshalJSON(p.Outros), p.ID,
 	)
 	return err
 }
@@ -376,36 +382,27 @@ func GetItensByCampanha(campanhaID string) ([]model.Item, error) {
 }
 
 func AddItem(campanhaID string, personagemID *string, tipo string, dados map[string]any) (model.Item, error) {
-	dadosJSON, err := json.Marshal(dados)
-	if err != nil {
-		return model.Item{}, err
-	}
-
 	var item model.Item
-	var dadosRaw []byte
+	var dadosRaw string
 
-	err = pool.QueryRow(context.Background(),
+	err := pool.QueryRow(context.Background(),
 		`INSERT INTO itens (campanha_id, personagem_id, tipo, dados)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, campanha_id, personagem_id, tipo, dados`,
-		campanhaID, personagemID, tipo, dadosJSON,
+		campanhaID, personagemID, tipo, marshalJSON(dados),
 	).Scan(&item.ID, &item.CampanhaID, &item.PersonagemID, &item.Tipo, &dadosRaw)
 	if err != nil {
 		return model.Item{}, fmt.Errorf("erro ao criar item: %w", err)
 	}
 
-	json.Unmarshal(dadosRaw, &item.Dados)
+	json.Unmarshal([]byte(dadosRaw), &item.Dados)
 	return item, nil
 }
 
 func UpdateItem(itemID string, tipo string, dados map[string]any) error {
-	dadosJSON, err := json.Marshal(dados)
-	if err != nil {
-		return err
-	}
-	_, err = pool.Exec(context.Background(),
+	_, err := pool.Exec(context.Background(),
 		`UPDATE itens SET tipo=$1, dados=$2 WHERE id=$3`,
-		tipo, dadosJSON, itemID,
+		tipo, marshalJSON(dados), itemID,
 	)
 	return err
 }
