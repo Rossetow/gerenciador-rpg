@@ -436,7 +436,7 @@ func scanPersonagens(rows interface{ Next() bool; Scan(...any) error; Err() erro
 	var personagens []model.Personagem
 	for rows.Next() {
 		var p model.Personagem
-		var atributosRaw, habilidadesRaw, outrosRaw []byte
+		var atributosRaw, habilidadesRaw, outrosRaw string
 		if err := rows.Scan(
 			&p.ID, &p.Nome, &p.JogadorID, &p.CampanhaID,
 			&p.DescricaoFisica, &p.Caracteristicas,
@@ -445,9 +445,9 @@ func scanPersonagens(rows interface{ Next() bool; Scan(...any) error; Err() erro
 		); err != nil {
 			return nil, err
 		}
-		json.Unmarshal(atributosRaw, &p.AtributosBase)
-		json.Unmarshal(habilidadesRaw, &p.Habilidades)
-		json.Unmarshal(outrosRaw, &p.Outros)
+		json.Unmarshal([]byte(atributosRaw), &p.AtributosBase)
+		json.Unmarshal([]byte(habilidadesRaw), &p.Habilidades)
+		json.Unmarshal([]byte(outrosRaw), &p.Outros)
 		personagens = append(personagens, p)
 	}
 	if personagens == nil {
@@ -460,11 +460,11 @@ func scanItens(rows interface{ Next() bool; Scan(...any) error; Err() error }) (
 	var itens []model.Item
 	for rows.Next() {
 		var item model.Item
-		var dadosRaw []byte
+		var dadosRaw string
 		if err := rows.Scan(&item.ID, &item.CampanhaID, &item.PersonagemID, &item.Tipo, &dadosRaw); err != nil {
 			return nil, err
 		}
-		json.Unmarshal(dadosRaw, &item.Dados)
+		json.Unmarshal([]byte(dadosRaw), &item.Dados)
 		itens = append(itens, item)
 	}
 	if itens == nil {

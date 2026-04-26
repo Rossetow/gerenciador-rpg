@@ -189,14 +189,15 @@ function CampanhaDetalhe() {
     const fetchMissingJogadores = async () => {
       const ids = (personagens || []).map(p => p.jogador_id);
       for (const jid of ids) {
-        if (jid && !jogadoresMap[jid]) {
-          try {
-            const j = await apiGetJogadorById(jid);
-            setJogadoresMap(prev => ({ ...prev, [jid]: j.nome || jid }));
-          } catch (err) {
-            // Mantém fallback como próprio ID se falhar
-            setJogadoresMap(prev => ({ ...prev, [jid]: prev[jid] || jid }));
-          }
+        if (!jid) continue;
+        try {
+          const j = await apiGetJogadorById(jid);
+          setJogadoresMap(prev => {
+            if (prev[jid]) return prev;
+            return { ...prev, [jid]: j.nome || jid };
+          });
+        } catch (err) {
+          setJogadoresMap(prev => ({ ...prev, [jid]: prev[jid] || jid }));
         }
       }
     };
