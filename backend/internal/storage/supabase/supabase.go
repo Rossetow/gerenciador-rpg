@@ -1,65 +1,65 @@
 package supabase
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"log"
-	"net/http"
 	"os"
-	"path"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const bucket = "personagens-imagens"
 
 func UploadImagem(personagemID string, file io.Reader, contentType string) (string, error) {
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	supabaseKey := os.Getenv("SUPABASE_KEY")
+	endpoint := os.Getenv("SUPABASE_S3_ENDPOINT")
+	accessKey := os.Getenv("SUPABASE_S3_ACCESS_KEY")
+	secretKey := os.Getenv("SUPABASE_S3_SECRET_KEY")
+	bucket := os.Getenv("SUPABASE_BUCKET")
 
-	log.Printf("[supabase] upload start: personagemID=%s contentType=%s", personagemID, contentType)
-	log.Printf("[supabase] SUPABASE_URL=%q (set=%v)", supabaseURL, supabaseURL != "")
-	log.Printf("[supabase] SUPABASE_KEY set=%v", supabaseKey != "")
-
-	if supabaseURL == "" || supabaseKey == "" {
-		return "", fmt.Errorf("SUPABASE_URL and SUPABASE_KEY must be set")
+	if endpoint == "" || accessKey == "" || secretKey == "" || bucket == "" {
+		return "", fmt.Errorf("S3 env vars must be set")
 	}
 
 	ext := extensionFromContentType(contentType)
-	filename := personagemID + ext
+	key := personagemID + ext
 
-	body, err := io.ReadAll(file)
+	// Load config
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion("us-east-1"), // Supabase usa região fake
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+		return "", fmt.Errorf("failed to load aws config: %w", err)
 	}
-	log.Printf("[supabase] file read: %d bytes, filename=%s", len(body), filename)
 
-	uploadURL := supabaseURL + "/storage/v1/object/" + path.Join(bucket, filename)
-	log.Printf("[supabase] uploading to: %s", uploadURL)
+	// Create S3 client com endpoint customizado
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true // IMPORTANTE pro Supabase
+	})
 
-	req, err := http.NewRequest(http.MethodPost, uploadURL, bytes.NewReader(body))
+	// Upload
+	_, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
 	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+supabaseKey)
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("x-upsert", "true")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("[supabase] HTTP error: %v", err)
-		return "", fmt.Errorf("supabase upload failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	log.Printf("[supabase] response: status=%d body=%s", resp.StatusCode, string(respBody))
-
-	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("supabase upload error %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("failed to upload: %w", err)
 	}
 
-	publicURL := supabaseURL + "/storage/v1/object/public/" + path.Join(bucket, filename)
-	log.Printf("[supabase] upload success: publicURL=%s", publicURL)
+	// URL pública (igual antes)
+	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s",
+		os.Getenv("SUPABASE_URL"),
+		bucket,
+		key,
+	)
+
 	return publicURL, nil
 }
 

@@ -32,7 +32,7 @@ var (
 	addItem                         = service.AddItem
 	updateItem                      = service.UpdateItem
 	deleteItem                      = service.DeleteItem
-	getAllJogadores                  = service.GetAllJogadores
+	getAllJogadores                 = service.GetAllJogadores
 	getJogadoresPorCampanha         = service.GetJogadoresPorCampanha
 	adicionarJogadorCampanha        = service.AdicionarJogadorCampanha
 	removerJogadorCampanha          = service.RemoverJogadorCampanha
