@@ -1,123 +1,180 @@
-// /src/pages/JogadorDashboard.js
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiGetPersonagensByJogador, apiGetCampanhas, apiCreatePersonagem, apiGetCampanhaById } from '../api/mockApi';
+import { 
+    apiGetPersonagensByJogador, 
+    apiGetCampanhasByJogador, 
+    apiCreatePersonagem, 
+    apiGetCampanhaById
+} from '../api/api';
 import { useAuth } from '../context/AuthContext';
 
-// O FORMULÁRIO DINÂMICO
-function PersonagemForm({ campanha, jogadorId, onPersonagemCriado }) {
+// Formulário simplificado para criar um personagem.
+// A ficha completa será editada na página do personagem.
+function PersonagemForm({ campanha, jogadorId, onPersonagemCriado, onCancel }) {
   const [nome, setNome] = useState('');
-  const [atributos, setAtributos] = useState({});
-  const [habilidades, setHabilidades] = useState({});
-  const [outros, setOutros] = useState({});
-
-  // Atualiza o estado do formulário quando os valores são digitados
-  const handleMapChange = (map, setMap, key, value) => {
-    setMap({ ...map, [key]: parseInt(value, 10) || 0 });
-  };
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = {
+    if (!nome.trim()) {
+      alert('O nome do personagem é obrigatório.');
+      return;
+    }
+    setLoading(true);
+    try {
+      // Dados mínimos para criar o personagem no backend
+      const data = {
         nome: nome,
         jogador_id: jogadorId,
         campanha_id: campanha.id,
-        descricao_fisica: '',
-        caracteristicas: '',
-        atributos_base: atributos,
-        habilidades: habilidades,
-        outros: outros,
-        inventario: []
-    };
-    const novoPersonagem = await apiCreatePersonagem(data);
-    onPersonagemCriado(novoPersonagem);
+        // O backend inicializa os mapas de atributos, etc.
+      };
+      const novoPersonagem = await apiCreatePersonagem(data);
+      onPersonagemCriado(novoPersonagem);
+    } catch (error) {
+      alert(`Erro ao criar personagem: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-     <form onSubmit={handleSubmit} className="card">
-         <h3>Criar Ficha para: {campanha.nome}</h3>
-         <div className="form-group">
-            <label>Nome do Personagem</label>
-            <input value={nome} onChange={e => setNome(e.target.value)} required />
-         </div>
-
-        {/* Renderização dinâmica dos campos */}
-        {campanha.template_atributos_base.length > 0 && <h4>Atributos</h4>}
-        {campanha.template_atributos_base.map(key => (
-            <div className="form-group-inline" key={key}>
-                <label>{key}</label>
-                <input type="number" onChange={e => handleMapChange(atributos, setAtributos, key, e.target.value)} />
+     <div className="card-inset">
+        <h4>Criar Ficha para: "{campanha.nome}"</h4>
+        <form onSubmit={handleSubmit}>
+            <div className="form-group">
+                <label>Nome do Personagem</label>
+                <input 
+                  value={nome} 
+                  onChange={e => setNome(e.target.value)} 
+                  placeholder="Ex: Aragorn"
+                  required 
+                />
             </div>
-        ))}
-        {/* Repetir para habilidades e outros... */}
-        
-        <button type="submit" className="btn btn-primary">Salvar Ficha</button>
-     </form>
-  )
+            <div className="btn-group">
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Salvando...' : 'Salvar Personagem'}
+              </button>
+              <button type="button" className="btn btn-link" onClick={onCancel}>
+                  Cancelar
+              </button>
+            </div>
+        </form>
+     </div>
+  );
 }
 
 function JogadorDashboard() {
   const [meusPersonagens, setMeusPersonagens] = useState([]);
-  const [campanhas, setCampanhas] = useState([]);
+  const [campanhasDisponiveis, setCampanhasDisponiveis] = useState([]);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { jogador } = useAuth();
+  const [error, setError] = useState(null);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    Promise.all([
-        apiGetPersonagensByJogador(jogador.id),
-        apiGetCampanhas()
-    ]).then(([personagensData, campanhasData]) => {
-        setMeusPersonagens(personagensData);
-        setCampanhas(campanhasData);
-        setLoading(false);
-    });
-  }, [jogador.id]);
+    if (user && user.id) {
+      setLoading(true);
+      setError(null);
+      apiGetPersonagensByJogador(user.id)
+        .then(personagensData => {
+          setMeusPersonagens(personagensData || []);
+          return apiGetCampanhasByJogador(user.id);
+        })
+        .then((campanhasData) => {
+          setCampanhasDisponiveis(campanhasData || []);
+        })
+        .catch(err => {
+          console.error("Erro ao carregar dashboard:", err);
+          setError("Não foi possível carregar os dados. Tente recarregar a página.");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [user]);
 
-  const handlePersonagemCriado = (novoPersonagem) => {
-    setMeusPersonagens([...meusPersonagens, novoPersonagem]);
-    setCampanhaSelecionada(null); // Fecha o formulário
-    navigate(`/personagem/${novoPersonagem.id}`); // Navega para a ficha
+  const handleSelecionarCampanha = (campanhaId) => {
+    // Busca os detalhes da campanha para pegar os templates
+    apiGetCampanhaById(campanhaId)
+      .then(setCampanhaSelecionada)
+      .catch(err => alert(`Erro ao carregar detalhes da campanha: ${err.message}`));
   };
 
-  if (loading) return <p>Carregando...</p>;
+  const handlePersonagemCriado = (novoPersonagem) => {
+    try {
+      if (!novoPersonagem || !novoPersonagem.id) {
+        console.warn('Personagem criado sem ID:', novoPersonagem);
+        alert('Personagem criado, mas houve um problema ao obter o ID. Retornando ao seu dashboard.');
+        setCampanhaSelecionada(null);
+        navigate('/jogador');
+        return;
+      }
+      setMeusPersonagens([...meusPersonagens, novoPersonagem]);
+      setCampanhaSelecionada(null); // Fecha o formulário
+      // Navega para a nova ficha do personagem
+      navigate(`/jogador/personagem/${encodeURIComponent(novoPersonagem.id)}`);
+    } catch (e) {
+      console.error('Erro pós-criação:', e);
+      navigate('/jogador');
+    }
+  };
+
+  if (loading) return <p className="text-muted">Carregando seu dashboard...</p>;
+  if (error) return <p className="text-danger">{error}</p>;
 
   return (
     <div>
-      <h2>Dashboard do Jogador</h2>
+      <h2>Dashboard do Jogador: {user?.nome}</h2>
       <div className="layout-grid">
         <div className="card-list">
           <h3>Meus Personagens</h3>
           {meusPersonagens.length === 0 ? (
-            <p>Você não criou nenhum personagem.</p>
+            <p>Você ainda não tem personagens. Crie um ao lado!</p>
           ) : (
             meusPersonagens.map(p => (
-                <Link to={`/personagem/${p.id}`} key={p.id} className="card card-link">
+                <Link to={`/jogador/personagem/${encodeURIComponent(p.id)}`} key={p.id} className="card card-link">
                     <h4>{p.nome}</h4>
+                    <small>Campanha: ID {apiGetCampanhaById().nome}</small> {/* Melhorar isso depois */}
                 </Link>
             ))
           )}
         </div>
+        
         <div className="card">
+            <h3>Minhas Campanhas</h3>
+            <div className="btn-group-vertical">
+              {campanhasDisponiveis.length > 0 ? campanhasDisponiveis.map(c => (
+                <div key={c.id} className="card-inset">
+                  <div className="flex-row space-between">
+                    <div>
+                      <h4>{c.nome}</h4>
+                      {c.descricao && <p>{c.descricao}</p>}
+                    </div>
+                    <div className="btn-group">
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => handleSelecionarCampanha(c.id)}
+                      >
+                        Criar Personagem
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )) : <p>Nenhuma campanha disponível no momento.</p>}
+            </div>
+            <hr />
             <h3>Criar Novo Personagem</h3>
-            <p>Selecione uma campanha para criar sua ficha:</p>
-            {campanhas.map(c => (
-                <button 
-                    key={c.id} 
-                    className="btn btn-secondary"
-                    onClick={() => apiGetCampanhaById(c.id).then(setCampanhaSelecionada)}
-                >
-                    {c.nome}
-                </button>
-            ))}
-
-            {campanhaSelecionada && (
-                <PersonagemForm 
-                    campanha={campanhaSelecionada} 
-                    jogadorId={jogador.id}
-                    onPersonagemCriado={handlePersonagemCriado}
-                />
+            {!campanhaSelecionada ? (
+              <p>Selecione uma campanha acima para criar sua ficha.</p>
+            ) : (
+              <PersonagemForm 
+                campanha={campanhaSelecionada} 
+                jogadorId={user.id}
+                onPersonagemCriado={handlePersonagemCriado}
+                onCancel={() => setCampanhaSelecionada(null)}
+              />
             )}
         </div>
       </div>

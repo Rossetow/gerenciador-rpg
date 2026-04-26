@@ -2,55 +2,54 @@
 // Conexão real com a API Go.
 
 // --- Configuração ---
-// Altere esta URL se o seu backend Go rodar em uma porta diferente.
+// No ambiente Docker, o frontend acessará o backend pelo nome do serviço.
+// A porta 8080 é a porta interna do container do backend.
 const BASE_URL = 'http://localhost:8080';
 
-// --- Helpers de Autenticação ---
+// --- Helpers de "Autenticação" ---
+// O backend atual não usa tokens, então apenas guardamos os dados do usuário.
 
 /**
- * Salva o token JWT no localStorage.
- * @param {string} token
+ * Salva os dados do usuário logado no localStorage.
+ * @param {object} userData
  */
-const setAuthToken = (token) => {
-    localStorage.setItem('authToken', token);
+const setUserData = (userData) => {
+    localStorage.setItem('userData', JSON.stringify(userData));
 };
 
 /**
- * Pega o token JWT do localStorage.
- * @returns {string | null}
+ * Pega os dados do usuário do localStorage.
+ * @returns {object | null}
  */
-const getAuthToken = () => {
-    return localStorage.getItem('authToken');
+export const getUserData = () => {
+    try {
+        return JSON.parse(localStorage.getItem('userData'));
+    } catch (e) {
+        return null;
+    }
 };
 
 /**
- * Remove o token do localStorage (para logout).
+ * Remove os dados do usuário do localStorage (para logout).
  */
-export const clearAuthToken = () => {
-    localStorage.removeItem('authToken');
+export const clearAuthData = () => {
+    localStorage.removeItem('userData');
 };
+
 
 // --- Helper Principal de Fetch ---
 
 /**
  * Função central para fazer chamadas à API.
- * Gerencia automaticamente a URL base, headers JSON e token de autenticação.
  * @param {string} endpoint O caminho do endpoint (ex: '/api/campanhas')
  * @param {RequestInit} options Opções do Fetch (method, body, etc.)
  * @returns {Promise<any>} O JSON da resposta
  */
 const apiFetch = async (endpoint, options = {}) => {
-    const token = getAuthToken();
-
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
     };
-
-    // Adiciona o token de autorização se existir e a rota for da API
-    if (token && endpoint.startsWith('/api')) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
 
     // Converte o body para JSON se ele existir
     if (options.body) {
@@ -87,21 +86,21 @@ const apiFetch = async (endpoint, options = {}) => {
 
 // --- Funções da API (Mapeadas do router.go) ---
 
-// --- API de Autenticação ---
-// NOTA: As funções de login agora esperam um objeto {email, senha}
-// e salvam o token recebido.
+// --- API de "Autenticação" ---
+// O login é feito apenas com o 'nome'
 
 export const apiLoginJogador = async (credentials) => {
+    // credentials é esperado como { nome: '...' }
     const data = await apiFetch('/jogador/login', {
         method: 'POST',
         body: credentials,
     });
-    if (data.token) {
-        setAuthToken(data.token);
-    }
-    return data; 
-}
+    setUserData({ ...data, userType: 'jogador' }); // Salva os dados do jogador
+    return data;
+};
+
 export const apiCadastroJogador = (jogadorData) => {
+    // jogadorData é esperado como { nome: '...' }
     return apiFetch('/jogador/cadastro', {
         method: 'POST',
         body: jogadorData,
@@ -109,14 +108,13 @@ export const apiCadastroJogador = (jogadorData) => {
 };
 
 export const apiLoginMestre = async (credentials) => {
+    // credentials é esperado como { nome: '...' }
     const data = await apiFetch('/mestre/login', {
         method: 'POST',
         body: credentials,
     });
-    if (data.token) {
-        setAuthToken(data.token);
-    }
-    return data; 
+    setUserData({ ...data, userType: 'mestre' }); // Salva os dados do mestre
+    return data;
 };
 
 export const apiCadastroMestre = (mestreData) => {
@@ -124,6 +122,16 @@ export const apiCadastroMestre = (mestreData) => {
         method: 'POST',
         body: mestreData,
     });
+};
+
+// --- API de Jogadores ---
+
+export const apiGetAllJogadores = () => {
+    return apiFetch('/api/jogadores');
+};
+
+export const apiGetJogadorById = (id) => {
+    return apiFetch(`/api/jogadores/${encodeURIComponent(id)}`);
 };
 
 
@@ -134,11 +142,32 @@ export const apiGetCampanhas = () => {
 };
 
 export const apiGetCampanhaById = (id) => {
-    return apiFetch(`/api/campanhas/${id}`);
+    return apiFetch(`/api/campanhas/${encodeURIComponent(id)}`);
 };
 
 export const apiGetCampanhasByMestre = (mestreId) => {
-    return apiFetch(`/api/campanhas/mestre/${mestreId}`);
+    return apiFetch(`/api/campanhas/mestre/${encodeURIComponent(mestreId)}`);
+};
+
+export const apiGetCampanhasByJogador = (jogadorId) => {
+    return apiFetch(`/api/campanhas/jogador/${encodeURIComponent(jogadorId)}`);
+};
+
+export const apiGetJogadoresPorCampanha = (campanhaId) => {
+    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores`);
+};
+
+export const apiAdicionarJogador = (campanhaId, jogadorId) => {
+    return apiFetch(`/api/campanhas/${campanhaId}/jogadores`, {
+        method: 'POST',
+        body: { jogador_id: jogadorId },
+    });
+};
+
+export const apiRemoverJogador = (campanhaId, jogadorId) => {
+    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogadores/${encodeURIComponent(jogadorId)}`, {
+        method: 'DELETE',
+    });
 };
 
 export const apiCreateCampanha = (data) => {
@@ -164,22 +193,22 @@ export const apiUpdateCampanhaTemplate = (id, templateData) => {
 };
 
 export const apiGetPersonagensByCampanha = (campanhaId) => {
-    return apiFetch(`/api/campanhas/${campanhaId}/personagens`);
+    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/personagens`);
 };
 
 export const apiGetPersonagensByCampanhaJogador = (campanhaId, jogadorId) => {
-    return apiFetch(`/api/campanhas/${campanhaId}/jogador/${jogadorId}`);
+    return apiFetch(`/api/campanhas/${encodeURIComponent(campanhaId)}/jogador/${encodeURIComponent(jogadorId)}`);
 };
 
 
 // --- API de Personagens ---
 
 export const apiGetPersonagensByJogador = (jogadorId) => {
-    return apiFetch(`/api/personagens/jogador/${jogadorId}`);
+    return apiFetch(`/api/personagens/jogador/${encodeURIComponent(jogadorId)}`);
 };
 
 export const apiGetPersonagemById = (id) => {
-    return apiFetch(`/api/personagens/${id}`);
+    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`);
 };
 
 export const apiCreatePersonagem = (data) => {
@@ -190,14 +219,14 @@ export const apiCreatePersonagem = (data) => {
 };
 
 export const apiUpdatePersonagem = (id, data) => {
-    return apiFetch(`/api/personagens/${id}`, {
+    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: data,
     });
 };
 
 export const apiDeletePersonagem = (id) => {
-    return apiFetch(`/api/personagens/${id}`, {
+    return apiFetch(`/api/personagens/${encodeURIComponent(id)}`, {
         method: 'DELETE',
     });
 };
@@ -206,26 +235,47 @@ export const apiDeletePersonagem = (id) => {
 // --- API de Itens (Novo) ---
 
 export const apiGetItensByPersonagem = (personagemId) => {
-    return apiFetch(`/api/personagens/${personagemId}/itens`);
+    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`);
 };
 
 export const apiAddItem = (personagemId, itemData) => {
-    return apiFetch(`/api/personagens/${personagemId}/itens`, {
+    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/itens`, {
         method: 'POST',
-        body: itemData,
+        // O backend espera o body: { "item": { ... } }
+        body: { item: itemData },
     });
 };
 
-export const apiUpdateItem = (personagemId, itemData) => {
-    return apiFetch(`/api/personagens/${personagemId}/itens`, {
+export const apiUpdateItem = (personagemId, itemName, itemData) => {
+    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/items`, { // Endpoint corrigido: /items
         method: 'PUT',
-        body: itemData,
+        // O backend espera: { "nome": "nome_do_item_antigo", "item": { ... } }
+        body: { nome: itemName, item: itemData },
     });
 };
 
-export const apiDeleteItem = (personagemId, itemData) => {
-    return apiFetch(`/api/personagens/${personagemId}/itens`, {
+export const apiDeleteItem = (personagemId, itemName) => {
+    return apiFetch(`/api/personagens/${encodeURIComponent(personagemId)}/items/delete`, { // Endpoint corrigido: /items/delete
         method: 'DELETE',
-        body: itemData, // O ID do item a ser deletado vai no corpo
+        // O backend espera: { "nome": "nome_do_item" }
+        body: { nome: itemName },
     });
+};
+
+// --- API de Imagem do Personagem ---
+export const apiUploadPersonagemImagem = async (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${BASE_URL}/api/personagens/${encodeURIComponent(id)}/imagem`, {
+        method: 'POST',
+        body: formData, // Não definir Content-Type manualmente (o browser define com boundary)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData.error || response.statusText || 'Falha no upload da imagem';
+        throw new Error(msg);
+    }
+    return response.json(); // { imagem_url: string }
 };

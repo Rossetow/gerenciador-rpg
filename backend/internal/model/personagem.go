@@ -16,6 +16,13 @@ type Personagem struct {
 	DescricaoFisica string `json:"descricao_fisica"`
 	Caracteristicas string `json:"caracteristicas"`
 
+	// Atributos vitais sempre presentes
+	Vida       int `json:"vida"`
+	VidaMaxima int `json:"vida_maxima"`
+
+	// URL pública da imagem (servida pelo backend em /uploads)
+	ImagemURL string `json:"imagem_url"`
+
 	// --- OS VALORES DINÂMICOS ---
 	// O Jogador preenche os valores.
 	// A *chave* do map (string) deve ser um item do Template da Campanha.
@@ -41,6 +48,9 @@ func NewPersonagem(nome, jogadorID, campanhaID string) Personagem {
 		Nome:       nome,
 		JogadorID:  jogadorID,
 		CampanhaID: campanhaID,
+		// Defaults para vida (podem ser ajustados na edição)
+		Vida:       0,
+		VidaMaxima: 0,
 		// Inicializa os maps e slices
 		AtributosBase: make(map[string]int),
 		Habilidades:   make(map[string]int),

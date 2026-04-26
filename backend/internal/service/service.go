@@ -27,6 +27,14 @@ func CreateMestre(nome string) (model.Jogador, error) {
 	novoJogador := model.NovoJogador(nome)
 	return storage.SetNovoMestre(novoJogador)
 }
+
+func GetAllJogadores() ([]model.Jogador, error) {
+	return storage.GetAllJogadores()
+}
+
+func GetJogadorByID(id string) (model.Jogador, error) {
+	return storage.GetJogador(id)
+}
 // --- CAMPANHAS ---
 
 func GetCampanhas() ([]model.Campanha, error) {
@@ -35,6 +43,10 @@ func GetCampanhas() ([]model.Campanha, error) {
 
 func GetCampanhasByMestre(mestreID string) ([]model.Campanha, error) {
 	return storage.GetCampanhasByMestre(mestreID)
+}
+
+func GetCampanhasByJogador(jogadorID string) ([]model.Campanha, error) {
+	return storage.GetCampanhasByJogador(jogadorID)
 }
 
 func CreateCampanha(campanha model.Campanha) (model.Campanha, error) {
@@ -69,6 +81,18 @@ func UpdateCampanhaTemplate(idCampanha string, templateAtributosBase, templateHa
 	return storage.UpdateTemplateCampanha(campanha)
 }
 
+func GetJogadoresPorCampanha(campanhaID string) ([]model.Jogador, error) {
+	return storage.GetJogadoresPorCampanha(campanhaID)
+}
+
+func AdicionarJogadorCampanha(campanhaID, jogadorID string) error {
+	return storage.AdicionarJogadorCampanha(campanhaID, jogadorID)
+}
+
+func RemoverJogadorCampanha(campanhaID, jogadorID string) error {
+	return storage.RemoverJogadorCampanha(campanhaID, jogadorID)
+}
+
 // --- PERSONAGENS ---
 
 func GetPersonagensByJogador(jogadorID string) ([]model.Personagem, error) {
@@ -76,7 +100,19 @@ func GetPersonagensByJogador(jogadorID string) ([]model.Personagem, error) {
 }
 
 func CreatePersonagem(req model.Personagem) (model.Personagem, error) {
-	return storage.CreatePersonagem(req)
+	novoPersonagem := model.NewPersonagem(
+		req.Nome,
+		req.JogadorID,
+		req.CampanhaID,
+	)
+	// Copia campos adicionais quando informados na criação
+	novoPersonagem.DescricaoFisica = req.DescricaoFisica
+	novoPersonagem.Caracteristicas = req.Caracteristicas
+	novoPersonagem.Vida = req.Vida
+	novoPersonagem.VidaMaxima = req.VidaMaxima
+	novoPersonagem.ImagemURL = req.ImagemURL
+
+	return storage.CreatePersonagem(novoPersonagem)
 }
 
 func GetPersonagemByID(id string) (model.Personagem, error) {

@@ -1,28 +1,39 @@
-// /src/pages/MestreDashboard.js
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { apiGetCampanhas, apiCreateCampanha } from '../api/mockApi';
+import { apiGetCampanhasByMestre, apiCreateCampanha } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 
-// Componente simples para o formulário
+// Componente para o formulário de criação de campanha
 function CampanhaForm({ onCampanhaCriada }) {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
-  const { jogador } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth(); // O usuário logado (mestre)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const novaCampanha = {
-      nome,
-      descricao,
-      template_atributos_base: [], // O Mestre edita isso na pág de detalhes
-      template_habilidades: [],
-      template_outros: [],
-    };
-    const campanha = await apiCreateCampanha(jogador.id, novaCampanha);
-    onCampanhaCriada(campanha);
-    setNome('');
-    setDescricao('');
+    if (!nome.trim()) {
+      alert('O nome da campanha é obrigatório.');
+      return;
+    }
+    setLoading(true);
+    try {
+      // O backend espera 'mestre_id' no corpo da requisição
+      const novaCampanha = {
+        nome: nome.trim(),
+        mestre_id: String(user.id),
+        descricao: descricao || ''
+      };
+      const campanhaCriada = await apiCreateCampanha(novaCampanha);
+      onCampanhaCriada(campanhaCriada); // Adiciona a nova campanha à lista
+      // Limpa o formulário
+      setNome('');
+      setDescricao('');
+    } catch (error) {
+      alert(`Erro ao criar campanha: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,17 +45,21 @@ function CampanhaForm({ onCampanhaCriada }) {
           type="text"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
+          placeholder="Ex: A Saga do Anel Perdido"
           required
         />
       </div>
       <div className="form-group">
-        <label>Descrição</label>
+        <label>Descrição (Opcional)</label>
         <textarea
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
+          placeholder="Uma breve sinopse da aventura"
         />
       </div>
-      <button type="submit" className="btn btn-primary">Criar</button>
+      <button type="submit" className="btn btn-primary" disabled={loading}>
+        {loading ? 'Criando...' : 'Criar Campanha'}
+      </button>
     </form>
   );
 }
@@ -52,33 +67,47 @@ function CampanhaForm({ onCampanhaCriada }) {
 function MestreDashboard() {
   const [campanhas, setCampanhas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { user } = useAuth(); // Pega o mestre logado
 
   useEffect(() => {
-    apiGetCampanhas().then((data) => {
-      setCampanhas(data);
-      setLoading(false);
-    });
-  }, []);
+    if (user && user.id) {
+      setLoading(true);
+      apiGetCampanhasByMestre(user.id)
+        .then((data) => {
+          setCampanhas(data || []); // Garante que campanhas seja um array
+        })
+        .catch((err) => {
+          console.error('Erro ao buscar campanhas:', err);
+          setError('Não foi possível carregar suas campanhas.');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [user]); // Roda o efeito sempre que o usuário mudar
 
   const handleCampanhaCriada = (novaCampanha) => {
-    setCampanhas([...campanhas, novaCampanha]);
+    setCampanhas((prevCampanhas) => [...prevCampanhas, novaCampanha]);
   };
 
-  if (loading) return <p>Carregando...</p>;
+  if (loading) return <p className="text-muted">Carregando seu dashboard...</p>;
+  if (error) return <p className="text-danger">{error}</p>;
 
   return (
     <div>
-      <h2>Dashboard do Mestre</h2>
+      <h2>Dashboard do Mestre: {user?.nome}</h2>
       <div className="layout-grid">
         <div className="card-list">
           <h3>Suas Campanhas</h3>
           {campanhas.length === 0 ? (
-            <p>Nenhuma campanha criada.</p>
+            <p>Você ainda não criou nenhuma campanha. Use o formulário ao lado para começar!</p>
           ) : (
             campanhas.map((c) => (
+              // O link deve levar para a página de detalhes da campanha do mestre
               <Link to={`/mestre/campanha/${c.id}`} key={c.id} className="card card-link">
                 <h4>{c.nome}</h4>
-                <p>{c.descricao}</p>
+                {c.descricao && <p>{c.descricao}</p>}
               </Link>
             ))
           )}

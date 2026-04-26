@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"gerenciador-de-fichas/internal/model"
 	"gerenciador-de-fichas/internal/service"
 	"net/http"
@@ -29,6 +33,12 @@ var (
 	addItem                         = service.AddItem
 	updateItem                      = service.UpdateItem
 	deleteItem                      = service.DeleteItem
+	getAllJogadores                 = service.GetAllJogadores
+	getJogadoresPorCampanha         = service.GetJogadoresPorCampanha
+	adicionarJogadorCampanha        = service.AdicionarJogadorCampanha
+	removerJogadorCampanha          = service.RemoverJogadorCampanha
+	getCampanhasByJogador           = service.GetCampanhasByJogador
+	getJogadorByID                  = service.GetJogadorByID
 )
 
 // --- JOGADOR ---
@@ -93,6 +103,26 @@ func CadastroMestre(c *gin.Context) {
 	c.JSON(http.StatusCreated, jogador)
 }
 
+func GetAllJogadores(c *gin.Context) {
+	jogadores, err := getAllJogadores()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, jogadores)
+}
+
+// GET /api/jogadores/:id
+func GetJogadorByID(c *gin.Context) {
+	id := c.Param("id")
+	jogador, err := getJogadorByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, jogador)
+}
+
 // --- CAMPANHAS ---
 
 func GetCampanhas(c *gin.Context) {
@@ -107,6 +137,16 @@ func GetCampanhas(c *gin.Context) {
 func GetCampanhasByMestre(c *gin.Context) {
 	mestreID := c.Param("mestre_id")
 	campanhas, err := getCampanhaByMestre(mestreID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, campanhas)
+}
+
+func GetCampanhasByJogador(c *gin.Context) {
+	jogadorID := c.Param("jogador_id")
+	campanhas, err := getCampanhasByJogador(jogadorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -178,6 +218,44 @@ func GetPersonagensByCampanhaJogador(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, personagens)
+}
+
+func GetJogadoresPorCampanha(c *gin.Context) {
+	campanhaID := c.Param("id")
+	jogadores, err := getJogadoresPorCampanha(campanhaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, jogadores)
+}
+
+func AdicionarJogadorCampanha(c *gin.Context) {
+	campanhaID := c.Param("id")
+	var req struct {
+		JogadorID string `json:"jogador_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := adicionarJogadorCampanha(campanhaID, req.JogadorID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "jogador adicionado"})
+}
+
+func RemoverJogadorCampanha(c *gin.Context) {
+	campanhaID := c.Param("id")
+	jogadorID := c.Param("jogador_id")
+
+	if err := removerJogadorCampanha(campanhaID, jogadorID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "jogador removido"})
 }
 
 // --- PERSONAGENS ---
@@ -299,4 +377,53 @@ func DeleteItem(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "item deletado"})
+}
+
+// --- Upload de imagem do Personagem ---
+func UploadPersonagemImagem(c *gin.Context) {
+	id := c.Param("id")
+
+	// Obtém o arquivo enviado (campo "file")
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "arquivo não enviado (campo 'file' obrigatório)"})
+		return
+	}
+
+	// Garante a existência da pasta de uploads
+	uploadDir := "uploads"
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("falha ao criar pasta de uploads: %v", err)})
+		return
+	}
+
+	// Monta um nome de arquivo previsível com o ID do personagem e a extensão original
+	ext := filepath.Ext(file.Filename)
+	if ext == "" {
+		ext = ".png"
+	}
+	filename := id + ext
+	destPath := filepath.Join(uploadDir, filename)
+
+	// Salva o arquivo no disco
+	if err := c.SaveUploadedFile(file, destPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("falha ao salvar arquivo: %v", err)})
+		return
+	}
+
+	// Atualiza o Personagem com a URL pública da imagem
+	personagem, err := getPersonagemByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	personagem.ImagemURL = "/uploads/" + filename
+
+	if err := updatePersonagem(personagem); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"imagem_url": personagem.ImagemURL})
 }

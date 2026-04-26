@@ -1,223 +1,325 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   apiGetCampanhaById,
   apiGetPersonagensByCampanha,
-  apiUpdateCampanha,
-} from '../api/mockApi';
+  apiUpdateCampanhaTemplate,
+  apiGetJogadoresPorCampanha,
+  apiCreatePersonagem,
+  apiGetJogadorById,
+} from '../api/api';
+import GerenciarJogadoresModal from '../components/GerenciarJogadoresModal';
 
-// --- TemplateEditor ATUALIZADO ---
-// Este componente agora tem um formulário de "Adicionar/Editar"
-// e 3 listas interativas para os campos do template.
+// --- TemplateEditor SIMPLIFICADO ---
+// Agora usa textareas para edição em massa, o que é mais simples
+// e alinhado com a forma como a API salva os dados.
 
 function TemplateEditor({ campanha, onTemplateSave }) {
-  // Estados para as 3 listas de campos
-  const [atributos, setAtributos] = useState(campanha.template_atributos_base || []);
-  const [habilidades, setHabilidades] = useState(campanha.template_habilidades || []);
-  const [outros, setOutros] = useState(campanha.template_outros || []);
+  // Estado baseado em arrays, com UI de rows (add/remove)
+  const [atributos, setAtributos] = useState([...(campanha.template_atributos_base || [])]);
+  const [habilidades, setHabilidades] = useState([...(campanha.template_habilidades || [])]);
+  const [outros, setOutros] = useState([...(campanha.template_outros || [])]);
+  const [loading, setLoading] = useState(false);
 
-  // Estado para o formulário de Adicionar/Editar
-  const [campo, setCampo] = useState('');
-  const [tipo, setTipo] = useState('atributos');
-  const [editConfig, setEditConfig] = useState(null); // Guarda { tipo, index } se estiver editando
+  const ensureAtLeastOne = (arr) => (arr.length === 0 ? [''] : arr);
 
-  // --- Handlers para Ações ---
-
-  const handleStartEdit = (tipo, index, nome) => {
-    setEditConfig({ tipo, index });
-    setTipo(tipo);
-    setCampo(nome);
+  const onChangeAt = (setter) => (idx, value) => {
+    setter(prev => {
+      const next = [...prev];
+      next[idx] = value;
+      return next;
+    });
   };
 
-  const handleCancelEdit = () => {
-    setEditConfig(null);
-    setCampo('');
-    setTipo('atributos');
+  const onAddRow = (setter) => () => {
+    setter(prev => [...prev, '']);
   };
 
-  const handleDelete = (tipo, index) => {
-    if (!window.confirm('Tem certeza que quer excluir este campo?')) return;
-
-    if (tipo === 'atributos') setAtributos(atributos.filter((_, i) => i !== index));
-    if (tipo === 'habilidades') setHabilidades(habilidades.filter((_, i) => i !== index));
-    if (tipo === 'outros') setOutros(outros.filter((_, i) => i !== index));
+  const onRemoveRow = (setter) => (idx) => {
+    setter(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSubmitForm = (e) => {
-    e.preventDefault();
-    if (!campo) return;
-
-    if (editConfig) {
-      // --- Lógica de ATUALIZAR ---
-      const { tipo, index } = editConfig;
-      if (tipo === 'atributos') {
-        const newList = [...atributos];
-        newList[index] = campo;
-        setAtributos(newList);
-      }
-      if (tipo === 'habilidades') {
-        const newList = [...habilidades];
-        newList[index] = campo;
-        setHabilidades(newList);
-      }
-      if (tipo === 'outros') {
-        const newList = [...outros];
-        newList[index] = campo;
-        setOutros(newList);
-      }
-      handleCancelEdit(); // Reseta o formulário
-    } else {
-      // --- Lógica de ADICIONAR ---
-      if (tipo === 'atributos') setAtributos([...atributos, campo]);
-      if (tipo === 'habilidades') setHabilidades([...habilidades, campo]);
-      if (tipo === 'outros') setOutros([...outros, campo]);
-      setCampo(''); // Limpa o campo de texto
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const data = {
+        template_atributos_base: (atributos || []).map(s => String(s).trim()).filter(Boolean),
+        template_habilidades: (habilidades || []).map(s => String(s).trim()).filter(Boolean),
+        template_outros: (outros || []).map(s => String(s).trim()).filter(Boolean),
+      };
+      await onTemplateSave(data);
+      alert('Template da ficha salvo com sucesso!');
+    } catch (error) {
+      alert(`Erro ao salvar o template: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Salva TODAS as listas no "backend"
-  const handleSaveTemplate = () => {
-    const data = {
-      template_atributos_base: atributos,
-      template_habilidades: habilidades,
-      template_outros: outros,
-    };
-    onTemplateSave(data);
-    alert('Template salvo!');
-  };
-
-  // Função auxiliar para renderizar cada "tabela"
-  const renderList = (title, list, tipo) => (
-    <div className="template-list-container">
+  const renderList = (title, values, setValues, placeholder) => (
+    <div className="card-inset">
       <h4>{title}</h4>
-      {list.length === 0 ? (
-        <p className="empty-list">Nenhum campo adicionado.</p>
-      ) : (
-        <ul className="template-list">
-          {list.map((nome, index) => (
-            <li key={index} className="template-item">
-              <span className="item-name">{nome}</span>
-              <div className="item-actions">
-                <button
-                  onClick={() => handleStartEdit(tipo, index, nome)}
-                  className="btn btn-sm btn-edit"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(tipo, index)}
-                  className="btn btn-sm btn-delete"
-                >
-                  Excluir
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="template-list">
+        {ensureAtLeastOne(values).map((val, idx) => (
+          <li key={`${title}-${idx}`} className="template-item">
+            <div className="form-group flex-1 mb-0">
+              <label className="label-tight">{title} #{idx + 1}</label>
+              <input
+                value={val}
+                onChange={(e) => onChangeAt(setValues)(idx, e.target.value)}
+                placeholder={placeholder}
+              />
+            </div>
+            <div className="item-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => onRemoveRow(setValues)(idx)}
+                disabled={values.length <= 1}
+                title="Remover"
+              >
+                Remover
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="btn-group mt-05">
+        <button type="button" className="btn btn-secondary" onClick={onAddRow(setValues)}>
+          Adicionar Novo
+        </button>
+      </div>
     </div>
   );
 
   return (
     <div className="card">
       <h3>Editor do Template da Ficha</h3>
+      <small className="empty-list">Adicione, renomeie ou remova linhas para personalizar os campos da ficha.</small>
 
-      {/* --- Formulário de Adicionar/Editar --- */}
-      <form onSubmit={handleSubmitForm} className="card-light">
-        <h4>{editConfig ? 'Editar Campo' : 'Adicionar Novo Campo'}</h4>
-        <div className="form-group">
-          <label>Nome do Campo</label>
-          <input value={campo} onChange={(e) => setCampo(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label>Tipo do Campo</label>
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            disabled={!!editConfig} // Desabilita o 'select' se estiver editando
-          >
-            <option value="atributos">Atributo Base</option>
-            <option value="habilidades">Habilidade</option>
-            <option value="outros">Outro</option>
-          </select>
-        </div>
-        <div className="btn-group">
-          <button type="submit" className="btn btn-primary">
-            {editConfig ? 'Atualizar Campo' : 'Adicionar Campo'}
-          </button>
-          {editConfig && (
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="btn btn-link"
-            >
-              Cancelar Edição
-            </button>
-          )}
-        </div>
-      </form>
+      {renderList('Atributo', atributos, setAtributos, 'Ex: Força')}
+      {renderList('Habilidade', habilidades, setHabilidades, 'Ex: Furtividade')}
+      {renderList('Outro Campo', outros, setOutros, 'Ex: Pontos de Vida')}
 
-      {/* --- Listas / "Tabelas" --- */}
-      {renderList('Atributos Base', atributos, 'atributos')}
-      {renderList('Habilidades', habilidades, 'habilidades')}
-      {renderList('Outros', outros, 'outros')}
-
-      {/* --- Botão de Salvar --- */}
-      <hr />
-      <button onClick={handleSaveTemplate} className="btn btn-primary btn-full">
-        Salvar Template Inteiro
+      <button onClick={handleSave} className="btn btn-primary btn-full" disabled={loading}>
+        {loading ? 'Salvando...' : 'Salvar Template'}
       </button>
     </div>
   );
 }
 
-// --- Componente Principal (sem mudanças) ---
+// --- Componente Principal ---
 function CampanhaDetalhe() {
   const { id } = useParams();
   const [campanha, setCampanha] = useState(null);
   const [personagens, setPersonagens] = useState([]);
+  const [jogadoresMap, setJogadoresMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const { user } = useAuth();
+
+  // Lista de jogadores para criação de personagem pelo mestre
+  const [jogadores, setJogadores] = useState([]);
+
+  // Formulário de criação de personagem (mestre)
+  const [novoNome, setNovoNome] = useState('');
+  const [novoJogadorId, setNovoJogadorId] = useState('');
+  const [novaVida, setNovaVida] = useState(0);
+  const [novaVidaMaxima, setNovaVidaMaxima] = useState(0);
+  const [creating, setCreating] = useState(false);
+
+  const handleCriarPersonagemMestre = async (e) => {
+    e.preventDefault();
+    if (!novoNome.trim() || !novoJogadorId) {
+      alert('Informe nome e jogador.');
+      return;
+    }
+    try {
+      setCreating(true);
+      const req = {
+        nome: novoNome.trim(),
+        jogador_id: String(novoJogadorId),
+        campanha_id: id,
+        vida: parseInt(novaVida, 10) || 0,
+        vida_maxima: parseInt(novaVidaMaxima, 10) || 0,
+      };
+      const novo = await apiCreatePersonagem(req);
+      setPersonagens(prev => [...prev, novo]);
+      // Reset
+      setNovoNome('');
+      setNovoJogadorId('');
+      setNovaVida(0);
+      setNovaVidaMaxima(0);
+    } catch (err) {
+      alert(`Erro ao criar personagem: ${err.message}`);
+    } finally {
+      setCreating(false);
+    }
+  };
 
   useEffect(() => {
-    // Vamos garantir que ambos os 'awaits' funcionem
     const fetchData = async () => {
-      const campanhaData = await apiGetCampanhaById(id);
-      setCampanha(campanhaData);
-      const personagensData = await apiGetPersonagensByCampanha(id);
-      setPersonagens(personagensData);
+      try {
+        setLoading(true);
+        const campanhaData = await apiGetCampanhaById(id);
+        setCampanha(campanhaData);
+        const personagensData = await apiGetPersonagensByCampanha(id);
+        setPersonagens(personagensData || []);
+        // Mapeia jogadores da campanha (id -> nome)
+        const jogadores = await apiGetJogadoresPorCampanha(id);
+        const map = {};
+        (jogadores || []).forEach(j => { map[j.id] = j.nome; });
+        setJogadoresMap(map);
+        setJogadores(jogadores || []);
+      } catch (err) {
+        console.error("Erro ao carregar detalhes da campanha:", err);
+        setError("Não foi possível carregar os dados da campanha.");
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [id]);
 
-  const handleTemplateSave = async (data) => {
-    const campanhaAtualizada = await apiUpdateCampanha(id, data);
-    setCampanha(campanhaAtualizada);
+  // Completa o mapa de jogadores buscando individualmente por ID quando necessário
+  useEffect(() => {
+    const fetchMissingJogadores = async () => {
+      const ids = (personagens || []).map(p => p.jogador_id);
+      for (const jid of ids) {
+        if (jid && !jogadoresMap[jid]) {
+          try {
+            const j = await apiGetJogadorById(jid);
+            setJogadoresMap(prev => ({ ...prev, [jid]: j.nome || jid }));
+          } catch (err) {
+            // Mantém fallback como próprio ID se falhar
+            setJogadoresMap(prev => ({ ...prev, [jid]: prev[jid] || jid }));
+          }
+        }
+      }
+    };
+    fetchMissingJogadores();
+  }, [personagens]);
+
+  // Resolve nome do jogador de forma síncrona, preenchendo cache assincronamente
+  const apiGetJogadorByIdCached = (jid) => {
+    const nome = jogadoresMap[jid];
+    if (nome) return nome;
+    if (jid) {
+      apiGetJogadorById(jid)
+        .then((j) => {
+          if (j && j.id) {
+            setJogadoresMap((prev) => ({ ...prev, [jid]: j.nome || jid }));
+          }
+        })
+        .catch(() => {
+          // Mantém fallback para o próprio ID
+        });
+    }
+    return jid;
   };
 
-  if (!campanha) return <p>Carregando campanha...</p>;
+  const handleTemplateSave = async (templateData) => {
+    // A API de template não retorna a campanha atualizada,
+    // então atualizamos o estado localmente para refletir a mudança.
+    await apiUpdateCampanhaTemplate(id, templateData);
+    setCampanha(prev => ({ ...prev, ...templateData }));
+  };
+
+  if (loading) return <p className="text-muted">Carregando detalhes da campanha...</p>;
+  if (error) return <p className="text-danger">{error}</p>;
+  if (!campanha) return <p>Campanha não encontrada.</p>;
 
   return (
     <div>
-      <h2>{campanha.nome}</h2>
-      <p>{campanha.descricao}</p>
+      <h2>Gerenciar Campanha: {campanha.nome}</h2>
+      {campanha.descricao && <p>{campanha.descricao}</p>}
+
+      <button onClick={() => setShowModal(true)} className="btn btn-secondary">Gerenciar Jogadores</button>
+      
+      {showModal && <GerenciarJogadoresModal campanha={campanha} onClose={() => setShowModal(false)} />}
+
       <div className="layout-grid">
         <div className="card-list">
           <h3>Personagens na Campanha</h3>
           {personagens.length === 0 ? (
-            <p>Nenhum personagem nesta campanha.</p>
+            <p>Ainda não há personagens nesta campanha.</p>
           ) : (
-            personagens.map((p) => (
-              <Link
-                to={`/personagem/${p.id}`}
-                key={p.id}
-                className="card card-link"
-              >
-                {p.nome}
-              </Link>
-            ))
+            personagens.map((p) => {
+              // Vida atual e máxima padronizadas no modelo
+              const vidaAtual = typeof p.vida !== 'undefined' ? p.vida : '—';
+              const vidaMax = typeof p.vida_maxima !== 'undefined' ? p.vida_maxima : undefined;
+              const jogadorNome = apiGetJogadorByIdCached(p.jogador_id);
+              const descricaoVida = vidaMax !== undefined ? `${vidaAtual}/${vidaMax}` : `${vidaAtual}`;
+              const titulo = `${p.nome} - Vida: ${descricaoVida} (Jogador: ${jogadorNome})`;
+
+              return (
+                <Link
+                  to={`/mestre/personagem/${encodeURIComponent(p.id)}`}
+                  key={p.id}
+                  className="card card-link"
+                >
+                  <h4>{titulo}</h4>
+                </Link>
+              );
+            })
           )}
         </div>
-        {/* O TemplateEditor é renderizado aqui */}
-        <TemplateEditor campanha={campanha} onTemplateSave={handleTemplateSave} />
+        
+        <div>
+          <div className="card">
+            <h3>Criar Personagem (Mestre)</h3>
+            <form onSubmit={handleCriarPersonagemMestre}>
+              <div className="form-group">
+                <label>Nome</label>
+                <input
+                  value={novoNome}
+                  onChange={e => setNovoNome(e.target.value)}
+                  placeholder="Ex: Agron"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Jogador</label>
+                <select
+                  value={novoJogadorId}
+                  onChange={e => setNovoJogadorId(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione um jogador</option>
+                  {([...jogadores,  user] || []).map(j => (
+                    <option key={j.id} value={j.id}>{j.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group-inline">
+                <label>Vida Atual</label>
+                <input
+                  type="text"
+                  value={novaVida}
+                  onChange={e => setNovaVida(e.target.value)}
+                />
+              </div>
+              <div className="form-group-inline">
+                <label>Vida Máxima</label>
+                <input
+                  type="text"
+                  value={novaVidaMaxima}
+                  onChange={e => setNovaVidaMaxima(e.target.value)}
+                />
+              </div>
+              <div className="btn-group">
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? 'Criando...' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <TemplateEditor campanha={campanha} onTemplateSave={handleTemplateSave} />
+        </div>
       </div>
     </div>
   );

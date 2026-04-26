@@ -1,30 +1,66 @@
 // /src/context/AuthContext.js
-import React, { createContext, useState, useContext } from 'react';
-import { apiLogin } from '../api/mockApi';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { apiLoginJogador, apiLoginMestre, getUserData, clearAuthData } from '../api/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [jogador, setJogador] = useState(null); // O 'Jogador' logado
-  const [role, setRole] = useState(null); // 'mestre' ou 'jogador'
+  const [user, setUser] = useState(null); // Pode ser um jogador ou mestre
+  const [userType, setUserType] = useState(null); // 'jogador' ou 'mestre'
+  const [loading, setLoading] = useState(true); // Para checagem inicial
+
+  // Na inicialização, verifica se já existe um usuário salvo no localStorage
+  useEffect(() => {
+    const storedUser = getUserData();
+    if (storedUser && storedUser.id) {
+      setUser(storedUser);
+      setUserType(storedUser.userType);
+    }
+    setLoading(false);
+  }, []);
 
   const login = async (nome, asRole) => {
-    const jogadorLogado = await apiLogin(nome);
-    setJogador(jogadorLogado);
-    setRole(asRole);
-    // Em um app real, você salvaria isso no localStorage
+    try {
+      let loggedInData;
+      if (asRole === 'jogador') {
+        loggedInData = await apiLoginJogador({ nome });
+      } else if (asRole === 'mestre') {
+        loggedInData = await apiLoginMestre({ nome });
+      } else {
+        throw new Error('Tipo de login inválido.');
+      }
+      
+      // A api já salva os dados no localStorage com setUserData
+      const storedUser = getUserData();
+      if (storedUser) {
+        setUser(storedUser);
+        setUserType(storedUser.userType);
+      }
+
+      return storedUser;
+    } catch (error) {
+      console.error("Falha no login:", error);
+      // Limpa qualquer estado de login anterior em caso de falha
+      logout(); 
+      throw error;
+    }
   };
 
   const logout = () => {
-    setJogador(null);
-    setRole(null);
+    clearAuthData(); // Limpa o localStorage
+    setUser(null);
+    setUserType(null);
   };
 
+  // O valor do contexto inclui o usuário, seu tipo, as funções e o estado de carregamento
+  const value = { user, userType, login, logout, loading };
+
+  // Não renderiza os children até que a verificação inicial de auth seja concluída
   return (
-    <AuthContext.Provider value={{ jogador, role, login, logout }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);   
+export const useAuth = () => useContext(AuthContext);

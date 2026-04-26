@@ -3,14 +3,27 @@ import './Modal.css';
 
 function ItemModal({ item, index, onSave, onClose }) {
   // O estado 'formData' guarda as edições
-  const [formData, setFormData] = useState(null);
+  const defaultItem = {
+    nome: '',
+    tipo: 'Geral',
+    descricao: '',
+    quantidade: 1,
+    peso: 0,
+    valor: 0,
+    dano: '',
+    tipo_dano: '',
+    habilidade_requerida: '',
+    valor_defesa: 0,
+    localizacao: '',
+    efeitosTexto: ''
+  };
+
+  const [formData, setFormData] = useState(defaultItem);
 
   useEffect(() => {
     // Quando o item (prop) muda, atualiza o estado do formulário
-    setFormData(item);
+    setFormData(item && Object.keys(item).length ? item : defaultItem);
   }, [item]);
-
-  if (!formData) return null;
 
   // Handler genérico para atualizar o estado do formulário
   const handleChange = (e) => {
@@ -45,6 +58,25 @@ function ItemModal({ item, index, onSave, onClose }) {
           onChange={handleChange}
         />
       </div>
+
+      <div className="form-group">
+        <label>Tipo</label>
+        <select
+          name="tipo"
+          value={formData.tipo || 'Geral'}
+          onChange={handleChange}
+        >
+          <option value="Geral">Geral</option>
+          <option value="Arma">Arma</option>
+          <option value="Armadura">Armadura</option>
+          <option value="Consumível">Consumível</option>
+          <option value="Ferramenta">Ferramenta</option>
+          <option value="Material">Material</option>
+          <option value="Poção">Poção</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+
       <div className="form-group">
         <label>Descrição</label>
         <textarea
@@ -53,6 +85,7 @@ function ItemModal({ item, index, onSave, onClose }) {
           onChange={handleChange}
         />
       </div>
+
       <div className="form-grid-3">
         <div className="form-group">
           <label>Quantidade</label>
@@ -150,14 +183,17 @@ function ItemModal({ item, index, onSave, onClose }) {
     </>
   );
   
-  // TODO: Implementar UI para editar o map 'Efeitos'
+  // Editor simples para Efeitos (um por linha: "chave: valor")
   const renderEfeitos = () => (
-     <div className="form-group">
-        <label>Efeitos (Visualização)</label>
-        <pre className="code-block">
-            {JSON.stringify(formData.efeitos || {}, null, 2)}
-        </pre>
-     </div>
+    <div className="form-group">
+      <label>Efeitos (um por linha: "chave: valor")</label>
+      <textarea
+        name="efeitosTexto"
+        value={formData.efeitosTexto || ''}
+        onChange={handleChange}
+        placeholder={"Ex:\nveneno: 1d4 por rodada\nluz: 10m"}
+      />
+    </div>
   );
 
 
@@ -165,7 +201,7 @@ function ItemModal({ item, index, onSave, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Editar Item: {item.nome}</h2>
+          <h2>{formData?.nome ? 'Editar Item' : 'Adicionar Item'}</h2>
           <button onClick={onClose} className="modal-close-btn">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="modal-body">
