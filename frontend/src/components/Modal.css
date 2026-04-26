@@ -20,6 +20,7 @@
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
 .modal-header {
@@ -58,4 +59,37 @@
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 1rem;
+}
+
+.lista-jogadores {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.jogador-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--bg-lighter);
+}
+
+.jogador-item:last-child {
+  border-bottom: none;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  gap: 0.5rem;
+  border-top: 1px solid var(--bg-lighter);
+  padding-top: 0.75rem;
+}
+
+.modal-body {
+  margin-top: 0.5rem;
 }

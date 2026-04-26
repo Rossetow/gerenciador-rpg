@@ -1,89 +1,80 @@
 package model
 
-// type Item struct {
-// 	Nome        string            `json:"nome"`
-// 	Tipo        string            `json:"tipo"` // Ex: "Arma", "Armadura", "Consumível"
-// 	Descricao   string            `json:"descricao"`
-// 	Quantidade  int               `json:"quantidade"`
-// 	Peso        float64           `json:"peso"`
-// 	Valor       int               `json:"valor"`
-// 	Efeitos     map[string]string `json:"efeitos,omitempty"`
-// }
+// Item representa um objeto no inventário de um personagem ou no pool de uma campanha.
+// personagem_id pode ser nulo (item pertence à campanha, sem dono específico).
+type Item struct {
+	ID           string         `json:"id"`
+	CampanhaID   string         `json:"campanha_id"`
+	PersonagemID *string        `json:"personagem_id"` // nullable
+	Tipo         string         `json:"tipo"`
+	Dados        map[string]any `json:"dados"`
+}
 
-// // Arma foi melhorada para clareza e flexibilidade.
-// type Arma struct {
-// 	Item // "Arma" É UM "Item" (Embedding)
+// --- Structs tipadas por categoria de item ---
+// Usadas para validar e serializar o campo Dados de acordo com o Tipo.
 
-// 	TipoArma          string `json:"tipo_arma"`           // Ex: "Corpo-a-corpo", "Distância"
-// 	HabilidadeRequerida string `json:"habilidade_requerida"` // Ex: "Lutar", "Atirar"
-// 	Dano              string `json:"dano"`                // MELHORIA: "1d8", "2d6+1"
-// 	TipoDano          string `json:"tipo_dano,omitempty"` // NOVO: "Corte", "Perfurante", "Impacto"
-// }
+// ItemBase contém os campos presentes em todos os tipos de item.
+type ItemBase struct {
+	Nome      string  `json:"nome"`
+	Descricao string  `json:"descricao"`
+	Quantidade int    `json:"quantidade"`
+	Peso      float64 `json:"peso"`
+	Valor     float64 `json:"valor"`
+	Efeitos   string  `json:"efeitos"` // texto livre, ex: "veneno: 1d4 por rodada"
+}
 
-// func NewArma(nome, descricao, tipoArma, habilidade, dano, tipoDano string, peso float64, valor int) Arma {
-// 	return Arma{
-// 		// 1. Pré-configuramos os campos do Item embutido
-// 		Item: Item{
-// 			Nome:        nome,
-// 			Tipo:        "Arma", // <-- GARANTE O TIPO CORRETO
-// 			Descricao:   descricao,
-// 			Quantidade:  1,
-// 			Peso:        peso,
-// 			Valor:       valor,
-// 			Efeitos:     make(map[string]string), // Inicializa o mapa
-// 		},
-// 		// 2. Configuramos os campos específicos da Arma
-// 		TipoArma:          tipoArma,
-// 		HabilidadeRequerida: habilidade,
-// 		Dano:              dano,
-// 		TipoDano:          tipoDano,
-// 	}
-// }
+// ItemArma representa uma arma (espada, arco, etc.)
+type ItemArma struct {
+	ItemBase
+	Dano                string `json:"dano"`                  // ex: "1d8", "2d6+2"
+	TipoDano            string `json:"tipo_dano"`             // ex: "cortante", "perfurante"
+	TipoArma            string `json:"tipo_arma"`             // ex: "espada longa", "arco curto"
+	HabilidadeRequerida string `json:"habilidade_requerida"` // nome da habilidade vinculada
+}
 
-// // --- Exemplo com outros tipos de item ---
+// ItemArmadura representa uma peça de proteção.
+type ItemArmadura struct {
+	ItemBase
+	ValorDefesa  int    `json:"valor_defesa"`  // bônus de defesa plano
+	Localizacao  string `json:"localizacao"`   // ex: "peito", "cabeça", "pernas"
+	TipoArmadura string `json:"tipo_armadura"` // ex: "leve", "média", "pesada"
+}
 
-// // Armadura segue o mesmo padrão
-// type Armadura struct {
-// 	Item
-// 	ValorDefesa int    `json:"valor_defesa"`
-// 	Localizacao string `json:"localizacao"` // "Cabeça", "Torso", "Pernas"
-// }
+// ItemConsumivel representa comida, materiais de uso único, etc.
+type ItemConsumivel struct {
+	ItemBase
+	Usos      int    `json:"usos"`       // doses/usos restantes
+	EfeitoUso string `json:"efeito_uso"` // o que acontece ao consumir
+}
 
-// // NewArmadura é a construtora para Armadura
-// func NewArmadura(nome, descricao, localizacao string, defesa int, peso float64, valor int) Armadura {
-// 	return Armadura{
-// 		Item: Item{
-// 			Nome:       nome,
-// 			Tipo:       "Armadura", // <-- GARANTE O TIPO CORRETO
-// 			Descricao:  descricao,
-// 			Quantidade: 1,
-// 			Peso:       peso,
-// 			Valor:      valor,
-// 		},
-// 		ValorDefesa: defesa,
-// 		Localizacao: localizacao,
-// 	}
-// }
+// ItemPocao representa poções e elixires.
+type ItemPocao struct {
+	ItemBase
+	Usos      int    `json:"usos"`
+	EfeitoUso string `json:"efeito_uso"`
+	Duracao   string `json:"duracao"` // ex: "instantâneo", "1 hora"
+}
 
-// // Consumivel pode nem precisar de campos extras,
-// // seus efeitos podem ir todos no mapa 'Efeitos'.
-// type Consumivel struct {
-// 	Item
-// }
+// ItemFerramenta representa ferramentas e kits (ferramentas de ladrão, kit de cura, etc.)
+type ItemFerramenta struct {
+	ItemBase
+	HabilidadeRequerida string `json:"habilidade_requerida"`
+	BonusHabilidade     string `json:"bonus_habilidade"` // ex: "+2", "vantagem"
+}
 
-// // NewConsumivel é a construtora para Consumíveis
-// func NewConsumivel(nome, descricao string, quantidade int, peso float64, valor int, efeitos map[string]string) Consumivel {
-// 	return Consumivel{
-// 		Item: Item{
-// 			Nome:       nome,
-// 			Tipo:       "Consumível", // <-- GARANTE O TIPO CORRETO
-// 			Descricao:  descricao,
-// 			Quantidade: quantidade,
-// 			Peso:       peso,
-// 			Valor:      valor,
-// 			Efeitos:    efeitos,
-// 		},
-// 	}
-// }
+// ItemMaterial representa matérias-primas e componentes de crafting.
+type ItemMaterial struct {
+	ItemBase
+	Qualidade string `json:"qualidade"` // ex: "bruto", "refinado", "raro"
+	UsoCraft  string `json:"uso_craft"` // ex: "Barra de Ferro", "Pergaminho Encantado"
+}
 
-type Item map[string]any
+// ItemInformacao representa mapas, cartas, pergaminhos e documentos.
+type ItemInformacao struct {
+	ItemBase
+	Conteudo string `json:"conteudo"` // o texto/informação em si
+	Idioma   string `json:"idioma"`   // ex: "Comum", "Élfico"
+}
+
+// ItemGeral e ItemOutro usam ItemBase diretamente — sem campos extras.
+// Não precisam de struct separada; o handler usa ItemBase ao serializar.

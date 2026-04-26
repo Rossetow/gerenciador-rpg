@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
-  const { jogador, role, logout } = useAuth();
+  const { user, userType, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -14,15 +14,17 @@ function Navbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/" className="navbar-brand">RPG Manager</Link>
-      <div>
-        {jogador && (
+      <Link to="/" className="navbar-brand">Gerenciador de Fichas de RPG</Link>
+      <div className="navbar-user-info">
+        {user ? (
           <>
             <span className="navbar-text">
-              Logado como: {jogador.nome} ({role})
+              Bem-vindo, {user.nome}! ({userType})
             </span>
-            <button onClick={handleLogout} className="btn btn-outline">Logout</button>
+            <button onClick={handleLogout} className="btn btn-outline">Sair</button>
           </>
+        ) : (
+          <span className="navbar-text">Você não está logado.</span>
         )}
       </div>
     </nav>

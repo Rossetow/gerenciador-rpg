@@ -10,15 +10,21 @@ import PersonagemFicha from './pages/PersonagemFicha';
 import Navbar from './components/Navbar';
 import './App.css'; // Vamos adicionar estilos
 
-// Componente para proteger rotas
+// Componente para proteger rotas, agora usando o novo contexto
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const { jogador, role } = useAuth();
-  if (!jogador) {
+  const { user, userType, loading } = useAuth();
+
+  // Se ainda estiver verificando a autenticação, não renderize nada ainda.
+  if (loading) {
+    return <p>Verificando autenticação...</p>;
+  }
+
+  // Se não houver usuário ou o tipo de usuário for diferente do permitido, redireciona
+  if (!user || userType !== allowedRole) {
     return <Navigate to="/" replace />;
   }
-  if (role !== allowedRole) {
-    return <Navigate to="/" replace />; // Ou para uma página "Não Autorizado"
-  }
+  
+  // Se tudo estiver OK, renderiza a rota protegida
   return children;
 };
 
@@ -46,6 +52,14 @@ function App() {
             }
           />
           <Route
+            path="/mestre/personagem/:id"
+            element={
+              <ProtectedRoute allowedRole="mestre">
+                <PersonagemFicha />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/jogador"
             element={
               <ProtectedRoute allowedRole="jogador">
@@ -54,9 +68,16 @@ function App() {
             }
           />
           <Route
-            path="/personagem/:id" // Rota genérica, a própria página decide a permissão
-            element={<PersonagemFicha />}
+            path="/jogador/personagem/:id"
+            element={
+              <ProtectedRoute allowedRole="jogador">
+                <PersonagemFicha />
+              </ProtectedRoute>
+            }
           />
+
+          {/* Rota para "Não Encontrado" */}
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
     </div>
