@@ -1,3 +1,7 @@
+App Status:
+
+![Vercel Deploy](https://deploy-badge.vercel.app/vercel/gerenciador-rpg-wheat?style=for-the-badge)
+
 # Gerenciador de RPG
 
 Aplicação web para gerenciar campanhas e fichas de personagens de RPG de mesa. Mestres criam e configuram campanhas; jogadores criam personagens, preenchem atributos, gerenciam inventário e fazem upload de avatar.
